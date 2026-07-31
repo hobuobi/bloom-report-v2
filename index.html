@@ -259,6 +259,32 @@ body.reading #l2{padding-bottom:82vh}
   transition:opacity .3s cubic-bezier(.3,.7,.3,1),transform .3s cubic-bezier(.3,.7,.3,1);
 }
 .bubble.in{opacity:1;transform:scale(1)}
+
+/* the scrub — a readout that lives at the max line of the lane (where it
+   sits in normal flow, via margin-top) until scrolling would carry it
+   above the screen's midpoint, at which point it sticks there. */
+.scrub{
+  position:sticky;top:50vh;
+  z-index:27;
+  display:flex;align-items:center;
+  pointer-events:none;
+  transition:opacity .28s ease;
+}
+.scrub .pill{
+  flex:none;
+  font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.04em;
+  background:#fff;color:var(--c);
+  padding:9px 14px 9px 13px;
+  border-radius:0 999px 999px 0;
+  box-shadow:0 4px 14px rgba(0,0,0,.28);
+  white-space:nowrap;
+}
+.scrub .line{
+  flex:1 1 auto;height:1px;
+  background:rgba(255,255,255,.3);
+}
+body.reading .scrub{opacity:0;pointer-events:none}
+
 .lane-end{
   padding:34px 22px 60px;
   font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
@@ -548,9 +574,16 @@ const MODES = {
                    max: ps => Math.max(1, ...ps.map(p => p.vote.total)),
                    tick: v => v + ' VOTES' }
 };
+// short readout for the scrub pill — the axis rows already spell the unit out in full
+const SCRUB_TICK = {
+  consensus: v => v + '%',
+  controversial: v => v + ' pt',
+  all: v => v
+};
+const SCRUB_INSET = 70;   // px reserved on the left of the lane so squares clear the scrub pill
 
 const state = { theme: null, mode: 'consensus', sel: -1, layout: [] };
-let bubbleTimer = null, scrollRaf = null, whoTimer = null, l1Scroll = 0, kivTimer = null;
+let bubbleTimer = null, scrollRaf = null, whoTimer = null, l1Scroll = 0, kivTimer = null, scrubRaf = null;
 
 /* ─── LEVEL 1 ─────────────────────────────────────────── */
 function buildL1() {
@@ -598,7 +631,7 @@ function computeLayout(theme, mode) {
   const put = (r, y, size) => {
     let x = 0, ok = false;
     for (let k = 0; k < 18 && !ok; k++) {
-      x = 6 + Math.random() * Math.max(1, W - size - 12);
+      x = SCRUB_INSET + 6 + Math.random() * Math.max(1, W - size - 12 - SCRUB_INSET);
       ok = !placed.some(p =>
         Math.abs(p.y + p.size / 2 - (y + size / 2)) < (p.size + size) / 2 + 7 &&
         Math.abs(p.x + p.size / 2 - (x + size / 2)) < (p.size + size) / 2 + 7);
@@ -658,6 +691,17 @@ function drawLane() {
   state.layout = L;
   lane.style.height = L.height + 'px';
 
+  // scrub — an in-flow marker at the max line (margin-top:L.TOP), sticky
+  // once scrolling would carry it above mid-screen. Squares are drawn
+  // after it (they're absolutely positioned, so DOM order doesn't matter
+  // for them, but this keeps it as the lane's first flow child).
+  const scrub = el('div', 'scrub');
+  scrub.style.marginTop = L.TOP + 'px';
+  scrub.setAttribute('aria-hidden', 'true');
+  const pill = el('span', 'pill'); pill.id = 'scrubVal';
+  scrub.append(pill, el('span', 'line'));
+  lane.append(scrub);
+
   // axis
   const tick = MODES[state.mode].tick;
   [100, 75, 50, 25, 0].forEach(v => {
@@ -686,7 +730,29 @@ function drawLane() {
   $('#laneEnd').textContent = L.items.length + ' perspectives in this theme';
 
   startBubbles();
+  updateScrub();
 }
+
+/* ─── SCRUB ───────────────────────────────────────────── */
+// The scrub's own position is native CSS sticky — it just lives at the
+// max line until the scroll would carry it above mid-screen, then holds
+// there. All this does is read back wherever the browser actually put
+// it and label it with the axis value at that point.
+function updateScrub() {
+  if (!$('#l2').classList.contains('on') || !state.layout) return;
+  const L = state.layout;
+  const scrub = $('#lane .scrub');
+  if (!scrub) return;
+  const laneTop = $('#lane').getBoundingClientRect().top;
+  const localY = scrub.getBoundingClientRect().top - laneTop;
+  const frac = Math.max(0, Math.min(1, 1 - (localY - L.TOP) / L.axisH));
+  const val = Math.round(L.smax * frac);
+  $('#scrubVal').textContent = SCRUB_TICK[state.mode](val);
+}
+addEventListener('scroll', () => {
+  if (scrubRaf) return;
+  scrubRaf = requestAnimationFrame(() => { scrubRaf = null; updateScrub(); });
+}, { passive: true });
 
 /* ─── AMBIENT PREVIEW BUBBLES ─────────────────────────── */
 const bubbles = [];

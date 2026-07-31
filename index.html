@@ -25,6 +25,7 @@
 
   --nav-h:46px;
   --pill-h:58px;
+  --scrub-h:34px;
 }
 
 *{box-sizing:border-box}
@@ -209,6 +210,7 @@ body.reading #l2{padding-bottom:82vh}
 .lane{
   position:relative;
   overflow:visible;
+  display:flow-root;   /* stop scrub/minimap's margin-top from collapsing into .lane's own position */
 }
 .axisrow{
   position:absolute;left:0;right:0;height:0;
@@ -297,6 +299,7 @@ body.reading #l2{padding-bottom:82vh}
    above the screen's midpoint, at which point it sticks there. */
 .scrub{
   position:sticky;top:50vh;
+  height:var(--scrub-h);
   z-index:27;
   display:flex;align-items:center;
   pointer-events:none;
@@ -316,6 +319,37 @@ body.reading #l2{padding-bottom:82vh}
   background:#fff;
 }
 body.reading .scrub{opacity:0;pointer-events:none}
+
+/* the minimap — a condensed sparkline of every statement's position on
+   the current axis, living only inside the lane. Scrolls up with the
+   lane until fully below the nav + pills, then sticks there — top and
+   height are set in JS since they depend on the pills bar's rendered
+   height and the viewport size. z-index sits below .scrub so the
+   indicator line draws over it where the two cross. */
+.minimap{
+  position:sticky;left:0;
+  width:40px;
+  z-index:20;
+  background:rgba(255,255,255,.12);
+  border-radius:4px;
+  pointer-events:none;
+  transition:opacity .28s ease;
+}
+.minimap[hidden]{display:none}
+.minimap i{
+  position:absolute;left:0;right:0;height:2px;
+  background:rgba(255,255,255,.55);
+  border-radius:1px;
+  transform:translateY(-50%);
+}
+.minimap .now{
+  position:absolute;left:0;right:0;height:3px;
+  background:#ffd400;
+  border-radius:2px;
+  box-shadow:0 0 8px rgba(255,212,0,.75);
+  transform:translateY(-50%);
+}
+body.reading .minimap{opacity:0;pointer-events:none}
 
 .lane-end{
   padding:34px 22px 60px;
@@ -763,16 +797,45 @@ function drawLane() {
   state.layout = L;
   lane.style.height = L.height + 'px';
 
-  // scrub — an in-flow marker at the max line (margin-top:L.TOP), sticky
-  // once scrolling would carry it above mid-screen. Squares are drawn
-  // after it (they're absolutely positioned, so DOM order doesn't matter
-  // for them, but this keeps it as the lane's first flow child).
+  // scrub and minimap both anchor at the top score line and stick
+  // independently at their own offsets — each needs the whole (very
+  // tall) .lane as its containing block for that to hold for the full
+  // scroll, so both stay direct children of .lane rather than sharing
+  // a short wrapper. minimap is pulled back up to the same y via a
+  // negative margin sized to scrub's own fixed height (--scrub-h) —
+  // not a measured one, since scrub's pill text isn't set until
+  // updateScrub() runs further down, which would measure it empty.
   const scrub = el('div', 'scrub');
   scrub.style.marginTop = L.TOP + 'px';
   scrub.setAttribute('aria-hidden', 'true');
   const pill = el('span', 'pill'); pill.id = 'scrubVal';
   scrub.append(pill, el('span', 'line'));
   lane.append(scrub);
+
+  const mini = el('div', 'minimap');
+  mini.style.marginTop = 'calc(-1 * var(--scrub-h))';
+  mini.setAttribute('aria-hidden', 'true');
+  // sticks below both headers (nav + pills); fills the rest of the
+  // viewport, but never taller than the axis it's condensing. Set once
+  // now and again on the next frame — on a cold first paint the nav/
+  // pills heights can read a px short before layout fully settles.
+  const sizeMini = () => {
+    const topOffset = $('.l2nav').offsetHeight + $('.pills').offsetHeight;
+    const available = innerHeight - topOffset - 24;
+    mini.style.top = topOffset + 'px';
+    mini.style.height = Math.max(120, Math.min(available, L.axisH)) + 'px';
+  };
+  sizeMini();
+  document.fonts.ready.then(sizeMini);   // web-font swap can nudge pills' height by a px after first paint
+  L.items.forEach(it => {
+    const frac = Math.max(0, Math.min(1, (it.y - L.TOP) / L.axisH));
+    const tick = el('i');
+    tick.style.top = (frac * 100) + '%';
+    mini.append(tick);
+  });
+  const marker = el('div', 'now'); marker.id = 'miniNow';
+  mini.append(marker);
+  lane.append(mini);
 
   // axis
   const tick = MODES[state.mode].tick;
@@ -828,6 +891,10 @@ function updateScrub() {
     const it = L.items[+n.dataset.i];
     n.classList.toggle('hit', lineY >= it.y && lineY <= it.y + it.size);
   });
+
+  // mirror the same position onto the minimap's "you are here" marker
+  const marker = $('#miniNow');
+  if (marker) marker.style.top = ((1 - frac) * 100) + '%';
 }
 addEventListener('scroll', () => {
   if (scrubRaf) return;

@@ -346,33 +346,36 @@ body.reading .scrub{opacity:0;pointer-events:none}
 @keyframes cardIn{from{opacity:0;transform:translate(-50%,-46%) scale(.985)}to{opacity:1;transform:translate(-50%,-50%)}}
 
 .cardtop{
-  display:flex;align-items:flex-start;justify-content:space-between;
+  display:flex;align-items:center;
   padding:13px 16px 13px 14px;flex:none;
   background:var(--paper);
   border-bottom:1px solid color-mix(in srgb,var(--c) 16%,#fff);
   border-radius:24px 24px 0 0;
-  align-items:center;
 }
+/* consensus / difference / plain-agreement indicator for poll statements
+   (quotes have no vote data, so the pill is hidden entirely for those) */
 .who{
   display:inline-flex;align-items:center;gap:8px;
-  background:var(--c);color:#fff;
+  color:#fff;
   border-radius:999px;padding:5px 13px 5px 5px;
   min-height:30px;max-width:82%;
 }
+.who[hidden]{display:none}
+.who.consensus{background:var(--agree)}
+.who.difference{background:var(--disagree)}
+.who.neutral{background:#484848}
 .who .av{
   width:21px;height:21px;border-radius:50%;background:#fff;flex:none;
   display:grid;place-items:center;
 }
-.who .av svg{width:13px;height:13px;fill:var(--c);display:block}
+.who .av img{width:14px;height:14px;object-fit:contain;display:block}
 .who .txt{
   font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  transition:opacity .45s ease,transform .45s ease;
 }
-.who .txt.out{opacity:0;transform:translateY(-4px)}
 .closeb{
   flex:none;width:32px;height:32px;display:grid;place-items:center;
-  color:var(--c);margin:0 -2px 0 0;border-radius:50%;
+  color:var(--c);margin:0 -2px 0 auto;border-radius:50%;
   transition:background .2s ease;
 }
 .closeb:hover{background:rgba(0,0,0,.06)}
@@ -403,7 +406,7 @@ body.reading .scrub{opacity:0;pointer-events:none}
   margin:0 0 7px;
 }
 .meta .src{font-size:14px;line-height:1.4;margin:0 0 16px;font-weight:500}
-.meta .src small{display:block;font-weight:400;font-size:12.5px;opacity:.62;margin-top:2px}
+.meta .src small{display:block;font-weight:400;font-size:12.5px;margin-top:2px}
 .meta section + section{margin-top:16px}
 
 .grow{margin-bottom:11px}
@@ -504,8 +507,8 @@ body.reading .scrub{opacity:0;pointer-events:none}
     <div class="scrim" id="scrim"></div>
     <div class="card">
       <div class="cardtop">
-        <div class="who">
-          <span class="av"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.1" r="2.7"/><path d="M2.3 15.2c0-3.15 2.55-5.5 5.7-5.5s5.7 2.35 5.7 5.5z"/></svg></span>
+        <div class="who" id="who">
+          <span class="av" id="whoAv"></span>
           <span class="txt" id="whoTxt"></span>
         </div>
         <button class="closeb" id="closeb" aria-label="Close">
@@ -589,6 +592,13 @@ const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = s => document.querySelector(s);
 const el = (t, c, x) => { const n = document.createElement(t); if (c) n.className = c; if (x != null) n.textContent = x; return n; };
 const esc = s => s.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+// title-cases a raw ALL-CAPS chip (e.g. demographic tags), with one special
+// case: a bare "or" stays uppercase right after a comma — that's the Oregon
+// abbreviation ("Bend, OR"), not the conjunction ("White or Caucasian").
+const titleCaseChip = s => s.toLowerCase().replace(/\b\w+/g, (word, offset, str) => {
+  if (word === 'or') return str.slice(0, offset).trimEnd().endsWith(',') ? 'OR' : 'or';
+  return word.charAt(0).toUpperCase() + word.slice(1);
+});
 
 const byKey = {};
 DATA.themes.forEach(t => byKey[t.key] = t);
@@ -607,8 +617,12 @@ const SCRUB_TICK = {
 };
 const SCRUB_INSET = 70;   // px reserved on the left of the lane so squares clear the scrub pill
 
+// thresholds for the statement-card indicator pill (consensus/difference/neutral)
+const DIFFERENCE_MIN_GAP = 35;    // group-to-group gap (points) counted as a real split
+const CONSENSUS_MIN_AGREE = 65;   // minAgree (%) counted as both groups genuinely on board
+
 const state = { theme: null, mode: 'consensus', sel: -1, layout: [] };
-let bubbleTimer = null, scrollRaf = null, whoTimer = null, l1Scroll = 0, kivTimer = null, scrubRaf = null;
+let bubbleTimer = null, scrollRaf = null, l1Scroll = 0, kivTimer = null, scrubRaf = null;
 // square placement is randomized (jittered scatter, collision avoidance), so it's
 // computed once per theme/mode and cached — revisiting, switching modes back and
 // forth, or a resize (e.g. mobile browser chrome collapsing) must not reshuffle it
@@ -882,21 +896,23 @@ function open(idx) {
   document.querySelectorAll(itemSel + '.sel').forEach(n => n.classList.remove('sel'));
   document.querySelector(`${itemSel}[data-i="${idx}"]`)?.classList.add('sel');
 
-  // participant chips, rotating
-  clearInterval(whoTimer);
-  const chips = r.chips.length ? r.chips : ['Anonymous'];
-  const tx = $('#whoTxt');
-  let ci = 0;
-  tx.textContent = chips[0];
-  if (chips.length > 1 && !REDUCED) {
-    whoTimer = setInterval(() => {
-      tx.classList.add('out');
-      setTimeout(() => {
-        ci = (ci + 1) % chips.length;
-        tx.textContent = chips[ci];
-        tx.classList.remove('out');
-      }, 450);
-    }, 3000);
+  // consensus / difference / plain-agreement indicator — polls only,
+  // quotes carry no vote data so the pill is hidden for those
+  const who = $('#who');
+  who.hidden = !r.vote;
+  if (r.vote) {
+    const v = r.vote;
+    let cls, icon, label;
+    if (v.gap >= DIFFERENCE_MIN_GAP) {
+      cls = 'difference'; icon = 'static/difference.svg'; label = 'DIFFERENCE (' + v.gap + ' PTS)';
+    } else if (v.minAgree >= CONSENSUS_MIN_AGREE) {
+      cls = 'consensus'; icon = 'static/consensus.svg'; label = 'CONSENSUS (' + v.minAgree + '% PRO)';
+    } else {
+      cls = 'neutral'; icon = null; label = v.minAgree + '% AGREE';
+    }
+    who.className = 'who ' + cls;
+    $('#whoAv').innerHTML = icon ? `<img src="${icon}" alt="">` : '';
+    $('#whoTxt').textContent = label;
   }
 
   const q = $('#s-text');
@@ -909,12 +925,10 @@ function open(idx) {
   const src = el('section');
   src.append(el('h4', null, 'Source'));
   const sv = el('p', 'src', r.source);
-  const bits = [];
-  if (r.place) bits.push(r.place + ', Oregon');
-  if (r.origin === 'cocap_seed') bits.push('Seeded by COCAP, not a participant');
-  if (r.origin === 'participant') bits.push('Written by a participant');
-  if (r.inReport) bits.push('Published in the report');
-  if (bits.length) sv.append(el('small', null, bits.join(' · ')));
+  const info = r.origin === 'cocap_seed'
+    ? 'Host statement'
+    : (r.chips.length ? r.chips : ['Anonymous']).map(titleCaseChip).join(', ');
+  sv.append(el('small', null, 'Participant: ' + info));
   src.append(sv);
   m.append(src);
 
@@ -1014,7 +1028,6 @@ function autoScroll() {
 }
 
 function close() {
-  clearInterval(whoTimer);
   clearTimeout(kivTimer);
   cancelAnimationFrame(scrollRaf);
   document.body.classList.remove('reading');

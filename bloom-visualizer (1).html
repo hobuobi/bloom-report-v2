@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bloom — A Conversation on AI in Central Oregon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geom:wght@500;600;700&family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────
+   TOKENS
+   ───────────────────────────────────────────── */
+:root{
+  --ink:#101011;
+  --paper:#fff;
+  --agree:#1F8A3B;
+  --disagree:#D8362F;
+  --pass:#C4C4C4;
+
+  --geom:'Geom','Futura',system-ui,sans-serif;
+  --body:'Hanken Grotesk',system-ui,-apple-system,sans-serif;
+  --mono:'DM Mono',ui-monospace,'SF Mono',monospace;
+
+  --nav-h:46px;
+  --pill-h:58px;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--ink);
+  color:#fff;
+  font-family:var(--body);
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+:focus-visible{outline:2.5px solid currentColor;outline-offset:3px;border-radius:3px}
+
+/* The whole product lives in one column. Mobile = full bleed.
+   Wide viewports = a ~50% column, same layout, nothing reflows. */
+.shell{
+  width:100%;
+  max-width:600px;
+  margin:0 auto;
+  position:relative;
+  min-height:100vh;
+  min-height:100dvh;
+  background:var(--ink);
+}
+@media (min-width:660px){
+  body{background:#08080a}
+  .shell{box-shadow:0 0 0 1px rgba(255,255,255,.07)}
+}
+
+.label{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+
+/* ─────────────────────────────────────────────
+   LEVEL 1 — THEMES
+   ───────────────────────────────────────────── */
+#l1{display:block}
+.masthead{padding:26px 22px 20px}
+.masthead .eyebrow{color:rgba(255,255,255,.45);margin-bottom:9px}
+.masthead h1{
+  font-family:var(--geom);font-weight:700;font-size:23px;line-height:1.14;
+  margin:0;letter-spacing:-.012em;max-width:16em;
+}
+.masthead p{
+  font-size:14px;line-height:1.45;color:rgba(255,255,255,.5);
+  margin:12px 0 0;max-width:32em;
+}
+
+.theme-block{
+  display:block;width:100%;text-align:left;
+  background:var(--c);
+  padding:22px 22px 24px;
+  position:relative;
+  transition:filter .25s ease;
+  -webkit-tap-highlight-color:transparent;
+}
+.theme-block + .theme-block{box-shadow:inset 0 1px 0 rgba(255,255,255,.16)}
+.theme-block h2{
+  font-family:var(--geom);font-weight:700;
+  font-size:clamp(26px,7.4vw,32px);line-height:1.06;
+  letter-spacing:-.02em;margin:0 0 11px;
+  max-width:13em;
+}
+.theme-block .count{color:rgba(255,255,255,.78);margin-bottom:16px}
+.theme-block .arrow{
+  position:absolute;top:24px;right:20px;font-size:17px;
+  opacity:.45;transition:transform .3s ease,opacity .3s ease;
+}
+@media (hover:hover){
+  .theme-block:hover{filter:brightness(1.12) saturate(1.05)}
+  .theme-block:hover .arrow{transform:translateX(5px);opacity:1}
+}
+.theme-block:active{filter:brightness(.94)}
+
+/* the tally: one cell per record. filled = poll statement, ring = session quote */
+.tally{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,12px);
+  gap:4px;
+}
+.tally i{
+  display:block;width:12px;height:12px;border-radius:1.5px;
+  background:#fff;
+  animation:tallyIn .5s cubic-bezier(.2,.8,.3,1) both;
+}
+.tally i.q{background:rgba(255,255,255,.26);box-shadow:inset 0 0 0 1.5px #fff}
+@keyframes tallyIn{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:none}}
+
+.legend{
+  padding:20px 22px 46px;display:flex;gap:20px;flex-wrap:wrap;
+  color:rgba(255,255,255,.42);
+}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:11px;height:11px;border-radius:1.5px;background:rgba(255,255,255,.6);flex:none}
+.legend i.q{background:transparent;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.6)}
+
+/* ─────────────────────────────────────────────
+   LEVEL 2 — THEME VIEWER
+   ───────────────────────────────────────────── */
+#l2{
+  display:none;background:var(--c);min-height:100vh;min-height:100dvh;
+  position:relative;
+}
+#l2.on{display:block}
+
+.l2nav{
+  position:sticky;top:0;z-index:30;
+  transition:opacity .28s ease;
+  height:var(--nav-h);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 18px;
+  background:var(--c);
+  box-shadow:inset 0 -1px 0 rgba(255,255,255,.2);
+}
+.l2nav button{
+  font-family:var(--mono);font-size:11px;letter-spacing:.11em;text-transform:uppercase;
+  color:rgba(255,255,255,.82);padding:6px 0;
+  transition:color .2s ease;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.l2nav button:hover{color:#fff}
+.l2nav .nextT{max-width:62%;text-align:right}
+.l2nav .nextT b{font-weight:400;color:#fff}
+
+.hero{padding:26px 22px 0;position:relative}
+.hero::before{
+  content:'';position:absolute;inset:calc(-1 * var(--nav-h)) 0 auto 0;height:340px;
+  background:linear-gradient(180deg,rgba(0,0,0,.26),rgba(0,0,0,0));
+  pointer-events:none;
+}
+.hero > *{position:relative}
+.hero h1{
+  font-family:var(--geom);font-weight:700;
+  font-size:clamp(30px,9vw,40px);line-height:1.02;letter-spacing:-.024em;
+  margin:0 0 9px;
+}
+.hero .count{color:rgba(255,255,255,.72);margin-bottom:20px}
+.hero .desc{
+  font-size:16.5px;line-height:1.5;margin:0 0 26px;
+  color:#fff;letter-spacing:-.003em;
+}
+.hero .cta{font-size:15px;font-weight:600;margin-bottom:16px}
+
+/* mode pills — stay reachable while you scroll the lane */
+.pills{
+  position:sticky;top:var(--nav-h);z-index:25;
+  display:flex;gap:8px;
+  padding:0 22px 18px;
+  margin:0 -22px;
+  background:var(--c);
+}
+.pills::before{
+  content:'';position:absolute;left:0;right:0;top:-14px;height:14px;
+  background:var(--c);
+}
+/* while a statement is open, fade the chrome so the selected square
+   stays visible in the strip above the card */
+body.reading .l2nav,body.reading .pills{opacity:0;pointer-events:none}
+/* extra runway so even the last square in the lane can be lifted into
+   the strip above the card. Collapses again when the card closes. */
+body.reading #l2{padding-bottom:82vh}
+.pills{transition:opacity .28s ease}
+
+.pills button{
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  padding:9px 15px;border-radius:999px;
+  background:rgba(255,255,255,.17);color:#fff;
+  transition:background .2s ease,color .2s ease;
+}
+.pills button:hover{background:rgba(255,255,255,.28)}
+.pills button[aria-pressed="true"]{background:#fff;color:var(--c);font-weight:500}
+
+/* the lane */
+.lane{
+  position:relative;
+  margin-top:2px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18);
+  overflow:visible;
+}
+.axisrow{
+  position:absolute;left:0;right:0;height:0;
+  border-top:1px solid rgba(255,255,255,.17);
+  pointer-events:none;
+}
+.axisrow span{
+  position:absolute;right:9px;top:5px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:rgba(255,255,255,.78);
+}
+
+.sq{
+  position:absolute;padding:0;
+  background:none;border:0;
+  -webkit-tap-highlight-color:transparent;
+}
+.sq .face{
+  display:block;width:100%;height:100%;
+  background:#fff;border-radius:9px;
+  animation:breathe var(--dur,4s) ease-in-out var(--del,0s) infinite;
+  transition:box-shadow .25s ease;
+  will-change:transform;
+}
+.sq.quote .face{
+  background:rgba(255,255,255,.3);
+  box-shadow:inset 0 0 0 2.5px #fff;
+  border-radius:9px;
+}
+@keyframes breathe{
+  0%,100%{transform:scale(.955)}
+  50%{transform:scale(1.075)}
+}
+@media (hover:hover){
+  .sq:hover .face{animation-play-state:paused;transform:scale(1.09)}
+}
+.sq.sel .face{
+  animation-play-state:paused;transform:scale(1.06);
+  box-shadow:0 0 0 4px rgba(255,255,255,.4),0 8px 26px rgba(0,0,0,.3);
+}
+.sq.quote.sel .face{box-shadow:inset 0 0 0 2.5px #fff,0 0 0 4px rgba(255,255,255,.4)}
+
+/* the little text bubbles that surface every few seconds */
+.bubble{
+  position:absolute;z-index:12;
+  max-width:210px;
+  font-size:11.5px;line-height:1.35;
+  font-weight:500;
+  padding:6px 11px;border-radius:999px;
+  background:#fff;color:var(--c);
+  box-shadow:0 4px 16px rgba(0,0,0,.22);
+  pointer-events:none;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  opacity:0;transform:scale(.8);
+  transition:opacity .3s cubic-bezier(.3,.7,.3,1),transform .3s cubic-bezier(.3,.7,.3,1);
+}
+.bubble.in{opacity:1;transform:scale(1)}
+.lane-end{
+  padding:34px 22px 60px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:rgba(255,255,255,.4);text-align:center;
+}
+
+/* ─────────────────────────────────────────────
+   LEVEL 3 — STATEMENT
+   ───────────────────────────────────────────── */
+#l3{display:none;position:fixed;inset:0;z-index:60}
+#l3.on{display:block}
+.scrim{
+  position:absolute;inset:0;background:rgba(10,10,12,.42);
+  animation:fadeIn .3s ease both;
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+.card{
+  position:absolute;
+  left:50%;top:50%;transform:translate(-50%,-50%);
+  width:calc(100% - 28px);max-width:572px;
+  height:min(76vh,720px);
+  background:var(--paper);color:var(--c);
+  border-radius:24px;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  box-shadow:0 22px 60px rgba(0,0,0,.34);
+  animation:cardIn .34s cubic-bezier(.2,.85,.3,1) both;
+}
+@keyframes cardIn{from{opacity:0;transform:translate(-50%,-46%) scale(.985)}to{opacity:1;transform:translate(-50%,-50%)}}
+
+.cardtop{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  padding:13px 16px 13px 14px;flex:none;
+  background:var(--paper);
+  border-bottom:1px solid color-mix(in srgb,var(--c) 16%,#fff);
+  border-radius:24px 24px 0 0;
+  align-items:center;
+}
+.who{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--c);color:#fff;
+  border-radius:999px;padding:5px 13px 5px 5px;
+  min-height:30px;max-width:82%;
+}
+.who .av{
+  width:21px;height:21px;border-radius:50%;background:#fff;flex:none;
+  display:grid;place-items:center;
+}
+.who .av svg{width:13px;height:13px;fill:var(--c);display:block}
+.who .txt{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  transition:opacity .45s ease,transform .45s ease;
+}
+.who .txt.out{opacity:0;transform:translateY(-4px)}
+.closeb{
+  flex:none;width:32px;height:32px;display:grid;place-items:center;
+  color:var(--c);margin:0 -2px 0 0;border-radius:50%;
+  transition:background .2s ease;
+}
+.closeb:hover{background:rgba(0,0,0,.06)}
+.closeb svg{width:15px;height:15px;stroke:currentColor;stroke-width:2.2;fill:none}
+
+.cardbody{
+  flex:1 1 auto;min-height:0;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;
+  overscroll-behavior:contain;
+}
+.quotewrap{padding:26px 22px 26px}
+.quotewrap blockquote{
+  margin:0;font-family:var(--geom);font-weight:600;
+  font-size:var(--qs,26px);line-height:1.16;letter-spacing:-.016em;
+  color:var(--c);
+  text-wrap:pretty;
+}
+
+.meta{
+  border-top:1px solid color-mix(in srgb,var(--c) 18%,#fff);
+  padding:18px 22px 24px;
+}
+.meta h4{
+  font-family:var(--mono);font-weight:500;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:color-mix(in srgb,var(--c) 55%,#fff);
+  margin:0 0 7px;
+}
+.meta .src{font-size:14px;line-height:1.4;margin:0 0 16px;font-weight:500}
+.meta .src small{display:block;font-weight:400;font-size:12.5px;opacity:.62;margin-top:2px}
+.meta section + section{margin-top:16px}
+
+.grow{margin-bottom:11px}
+.grow:last-child{margin-bottom:2px}
+.grow .top{
+  display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  color:color-mix(in srgb,var(--c) 62%,#fff);
+  margin-bottom:5px;
+}
+.grow .top b{font-weight:500;color:var(--c)}
+.bar{display:flex;gap:2px;height:3px;border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:2px;transition:flex-grow .4s ease}
+.bar .d{background:var(--disagree)}
+.bar .p{background:var(--pass)}
+.bar .a{background:var(--agree)}
+.barkey{
+  display:flex;gap:13px;margin-top:9px;
+  font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;
+  color:color-mix(in srgb,var(--c) 48%,#fff);
+}
+.barkey span{display:inline-flex;align-items:center;gap:5px}
+.barkey i{width:9px;height:3px;border-radius:2px;flex:none}
+
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tags i{
+  font-style:normal;
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  padding:4px 9px;border-radius:999px;
+  background:color-mix(in srgb,var(--c) 11%,#fff);
+  color:var(--c);
+}
+
+.cardfoot{
+  flex:none;display:flex;align-items:center;justify-content:space-between;
+  padding:11px 16px;
+  border-top:1px solid color-mix(in srgb,var(--c) 20%,#fff);
+  background:var(--paper);
+}
+.cardfoot button{
+  width:44px;height:36px;display:grid;place-items:center;color:var(--c);
+  border-radius:10px;transition:background .18s ease,opacity .18s ease;
+}
+.cardfoot button:hover{background:color-mix(in srgb,var(--c) 9%,#fff)}
+.cardfoot button[disabled]{opacity:.24;cursor:default;background:none}
+.cardfoot svg{width:26px;height:14px;stroke:currentColor;stroke-width:1.9;fill:none}
+.cardfoot .pos{
+  font-family:var(--mono);font-size:13px;letter-spacing:.1em;color:var(--c);
+}
+.cardfoot .pos em{font-style:normal;opacity:.45}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ══ LEVEL 1 ══ -->
+  <main id="l1">
+    <div class="masthead">
+      <div class="eyebrow label">Bloom Project · COCAP · Central Oregon</div>
+      <h1>What 122 perspectives on AI actually said</h1>
+      <p>Six listening sessions and one open poll, sorted into eight themes. Each square below is one statement or one thing somebody said out loud.</p>
+    </div>
+    <div id="blocks"></div>
+    <div class="legend label">
+      <span><i></i> Poll statement</span>
+      <span><i class="q"></i> Session quote</span>
+    </div>
+  </main>
+
+  <!-- ══ LEVEL 2 ══ -->
+  <section id="l2" aria-hidden="true">
+    <div class="l2nav">
+      <button id="back">← Back</button>
+      <button class="nextT" id="nextT"></button>
+    </div>
+    <div class="hero">
+      <h1 id="t-title"></h1>
+      <div class="count label" id="t-count"></div>
+      <p class="desc" id="t-desc"></p>
+      <div class="cta">Click on any perspectives below:</div>
+      <div class="pills" role="group" aria-label="Sort perspectives">
+        <button data-mode="consensus" aria-pressed="true">Consensus</button>
+        <button data-mode="controversial" aria-pressed="false">Controversial</button>
+        <button data-mode="all" aria-pressed="false">All</button>
+      </div>
+    </div>
+    <div class="lane" id="lane"></div>
+    <div class="lane-end" id="laneEnd"></div>
+  </section>
+
+  <!-- ══ LEVEL 3 ══ -->
+  <div id="l3" role="dialog" aria-modal="true" aria-label="Statement detail" aria-hidden="true">
+    <div class="scrim" id="scrim"></div>
+    <div class="card">
+      <div class="cardtop">
+        <div class="who">
+          <span class="av"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="5.1" r="2.7"/><path d="M2.3 15.2c0-3.15 2.55-5.5 5.7-5.5s5.7 2.35 5.7 5.5z"/></svg></span>
+          <span class="txt" id="whoTxt"></span>
+        </div>
+        <button class="closeb" id="closeb" aria-label="Close">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5l11 11M13.5 2.5l-11 11" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div class="cardbody" id="cardbody">
+        <div class="quotewrap"><blockquote id="s-text"></blockquote></div>
+        <div class="meta" id="s-meta"></div>
+      </div>
+      <div class="cardfoot">
+        <button id="prev" aria-label="Previous statement"><svg viewBox="0 0 26 14" aria-hidden="true"><path d="M25 7H1.6M7.4 1.4L1.2 7l6.2 5.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="pos" id="pos"></div>
+        <button id="next" aria-label="Next statement"><svg viewBox="0 0 26 14" aria-hidden="true"><path d="M1 7h23.4M18.6 1.4L24.8 7l-6.2 5.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     THEME DESCRIPTIONS — edit this block, or edit theme-descriptions.json
+     next to this file (when served over http, the file wins). Nothing
+     else in the app needs to change.
+     ═══════════════════════════════════════════════════════════════════ -->
+<script type="application/json" id="theme-descriptions">
+{
+  "_readme": "Editable copy for the Level 2 theme headers. Keyed by theme key. Each entry has a 'description' (the paragraph under the statement count) and an optional 'note' (currently unused by the UI, kept for editorial context). Percentages are drawn from OR_Open_Poll_Analysis_2 tallies: Group A (~131 participants) skews skeptical, Group B (~201) skews optimistic. If you edit a number here, check it against the underlying statement — the app does not recompute these.",
+  "_groups": {
+    "A": "Skeptics (Polis Group A, ~131 participants)",
+    "B": "Optimists (Polis Group B, ~201 participants)"
+  },
+  "themes": {
+    "governance": {
+      "description": "There is almost no argument about who belongs in the room: involving rural and lower-income communities draws 91% and 94%, a formal seat for the Confederated Tribes of Warm Springs 91% and 90%. The fight is over what those rooms are for. Skeptics endorse the flat claim that AI's costs outweigh any benefit (83% vs 6%).",
+      "note": "Largest theme in the poll (24 statements) and the one where procedural consensus most clearly outruns substantive agreement."
+    },
+    "datacenters": {
+      "description": "The divide is fundamentally about the economic bargain. Optimists are far more receptive to the jobs-and-tax-revenue case (42% agree, against 1% of Skeptics), while Skeptics overwhelmingly endorse a firsthand account that the construction jobs are temporary and out-of-state (89% vs 54%). Both want disclosure: electricity reporting runs 99%/92%.",
+      "note": "The only theme where a single statement — the jobs-and-tax-revenue framing — is rejected almost absolutely by one group."
+    },
+    "education": {
+      "description": "Everyone wants rules — clear school policies on student use (94%/92%), transparency about how teachers and administrators use it (96%/91%). The disagreement is about cognition. Skeptics accept that AI is taking opportunity from artists and brain cells from children (95%); Optimists mostly don't (41%).",
+      "note": "Second-richest theme in the conversation record — five starred session quotes alongside twelve poll statements."
+    },
+    "mentalhealth": {
+      "description": "The thinnest poll evidence in the set and the thickest conversation record: three statements, nine session quotes. Skeptics far more readily accept that leaning on AI erodes turning to each other (85% vs 49%), and reject the mirror-image framing of AI as connective (11% vs 68%). Both refuse chatbots as teen therapy (6%/20%).",
+      "note": "Read this theme through the quotes, not the poll. The vote sample is too small to carry much weight on its own."
+    },
+    "workforce": {
+      "description": "No session quotes landed here, so this is the poll speaking alone. Worker protections travel across the divide — a right to know when AI is evaluating you runs 99%/87%. The split is over whether standing still has a price: Optimists accept that slowing down sends jobs to another state (51% vs 4%).",
+      "note": "The competitiveness argument is the single most group-defining framing in the theme."
+    },
+    "agency": {
+      "description": "This is a fight over inevitability, not over risk. Optimists accept that the changes are coming and the task is adaptation rather than resistance (73% vs 11%). Yet both groups want the most powerful systems to prove they can prevent catastrophic outcomes before deployment (94%/78%).",
+      "note": "Useful counterweight to the framing that existential-risk concern maps onto AI skepticism. It doesn't, cleanly."
+    },
+    "access": {
+      "description": "Both groups want the same infrastructure of trust: a rigorous, apolitical evidence base (100%/100%, the only perfect agreement in the poll) and disclosure from the algorithms choosing political content (94%/88%). They part company on whether access has arrived — AI replacing expensive professionals draws 82% of Optimists, 38% of Skeptics.",
+      "note": "Highest-participation statement in the whole poll sits here (243 votes) and it is a divergent one."
+    },
+    "privacy": {
+      "description": "The least polarized theme in the set, and the one the report has no section for — four statements added to hold what the other seven left uncovered. Parents seeing what minors discuss with AI companion apps draws 78% and 77%; the inverse phrasing is rejected identically at 7%.",
+      "note": "Claude-added theme, not editorial. Worth deciding whether it survives into a published version."
+    }
+  }
+}
+</script>
+
+<script type="application/json" id="bloom-data">{"themes":[{"n":1,"key":"governance","short":"Governance & Decision-Making","full":"Governance & Decision-making","color":"#17348C","poll":24,"quotes":3},{"n":2,"key":"datacenters","short":"Data Centers","full":"Data Centers & the Environment","color":"#CE302B","poll":14,"quotes":3},{"n":3,"key":"education","short":"Education & Children","full":"Education, Cognition & Children","color":"#137A22","poll":12,"quotes":5},{"n":4,"key":"mentalhealth","short":"Mental Health","full":"Mental Health & Social Connection","color":"#B01B6B","poll":3,"quotes":9},{"n":5,"key":"workforce","short":"Workforce & Labor","full":"Workforce & the Economy","color":"#8E3AD1","poll":17,"quotes":0},{"n":6,"key":"agency","short":"Existential Risk","full":"Human Agency, Existential Risk & Moving Fast","color":"#27756B","poll":8,"quotes":1},{"n":7,"key":"access","short":"Access & Accuracy","full":"Access, Information & Accuracy","color":"#0E6FA6","poll":12,"quotes":7},{"n":8,"key":"privacy","short":"Privacy & Personal Data","full":"Privacy & Personal Data","color":"#6B5C1E","poll":4,"quotes":0}],"records":[{"id":"p0","kind":"poll","text":"Oregon now requires large (especially new or expanding) data centers to report their water use. They should also have to report how much electricity they consume.","theme":2,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":218,"A":{"a":92,"d":1,"p":0,"n":93,"pct":99},"B":{"a":115,"d":4,"p":6,"n":125,"pct":92},"gap":7,"minAgree":92,"consensus":1},"source":"Open Poll","tags":["Data Centers"],"inReport":false},{"id":"p2","kind":"poll","text":"Tax breaks for AI companies building in Oregon should require demonstrated community benefits.","theme":5,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":204,"A":{"a":80,"d":3,"p":11,"n":94,"pct":85},"B":{"a":91,"d":7,"p":12,"n":110,"pct":83},"gap":2,"minAgree":83,"consensus":1},"source":"Open Poll","tags":["AI Companies"],"inReport":false},{"id":"p4","kind":"poll","text":"For teenagers who can't access or afford therapy, AI chatbots are better than nothing.","theme":4,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":199,"A":{"a":6,"d":73,"p":14,"n":93,"pct":6},"B":{"a":21,"d":50,"p":35,"n":106,"pct":20},"gap":14,"minAgree":6,"consensus":-1},"source":"Open Poll","tags":["Youth"],"inReport":false},{"id":"p5","kind":"poll","text":"Parents should be able to see what their minor children discuss with AI mental health or companion apps.","theme":8,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":239,"A":{"a":79,"d":8,"p":14,"n":101,"pct":78},"B":{"a":106,"d":15,"p":17,"n":138,"pct":77},"gap":1,"minAgree":77,"consensus":0},"source":"Open Poll","tags":["Youth","Environment"],"inReport":false},{"id":"p6","kind":"poll","text":"Oregon schools should have clear rules about when and how students can use AI.","theme":3,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":224,"A":{"a":91,"d":2,"p":4,"n":97,"pct":94},"B":{"a":117,"d":4,"p":6,"n":127,"pct":92},"gap":2,"minAgree":92,"consensus":1},"source":"Open Poll","tags":["Education"],"inReport":false},{"id":"p7","kind":"poll","text":"Learning how to use AI responsibly should be part of every Oregon student's education.","theme":3,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":215,"A":{"a":62,"d":20,"p":16,"n":98,"pct":63},"B":{"a":106,"d":1,"p":10,"n":117,"pct":91},"gap":28,"minAgree":63,"consensus":0},"source":"Open Poll","tags":["Education"],"inReport":false},{"id":"p10","kind":"poll","text":"Parents who are worried about AI in their children's schools should be educating themselves and organizing with other parents — not waiting for administrators to act.","theme":3,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":213,"A":{"a":80,"d":9,"p":9,"n":98,"pct":82},"B":{"a":93,"d":10,"p":12,"n":115,"pct":81},"gap":1,"minAgree":81,"consensus":1},"source":"Open Poll","tags":["Education"],"inReport":false},{"id":"p12","kind":"poll","text":"Companies that use AI to automate jobs should also help fund training for the workers they displace.","theme":5,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":242,"A":{"a":95,"d":3,"p":9,"n":107,"pct":89},"B":{"a":92,"d":29,"p":14,"n":135,"pct":68},"gap":21,"minAgree":68,"consensus":0},"source":"Open Poll","tags":["Workforce / Labor"],"inReport":false},{"id":"p13","kind":"poll","text":"Workers should have the right to know when AI is being used to evaluate their performance or productivity.","theme":5,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":218,"A":{"a":99,"d":0,"p":1,"n":100,"pct":99},"B":{"a":103,"d":7,"p":8,"n":118,"pct":87},"gap":12,"minAgree":87,"consensus":1},"source":"Open Poll","tags":["Workforce / Labor"],"inReport":false},{"id":"p16","kind":"poll","text":"The algorithms that decide which news and political content Oregonians see online should be required to disclose how they make those decisions.","theme":7,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":227,"A":{"a":99,"d":1,"p":5,"n":105,"pct":94},"B":{"a":107,"d":9,"p":6,"n":122,"pct":88},"gap":6,"minAgree":88,"consensus":1},"source":"Open Poll","tags":["News & (mis)information"],"inReport":false},{"id":"p18","kind":"poll","text":"Government should be required to disclose when and how it is using AI to make decisions, and why it thinks it is a better use of taxpayer money than the alternative.","theme":1,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":234,"A":{"a":104,"d":0,"p":1,"n":105,"pct":99},"B":{"a":108,"d":8,"p":13,"n":129,"pct":84},"gap":15,"minAgree":84,"consensus":1},"source":"Open Poll","tags":["Government / Public Sector"],"inReport":false},{"id":"p22","kind":"poll","text":"Oregon's strong community networks — neighbors, faith groups, civic organizations — have a role to play in helping residents navigate AI, not just governments and tech companies.","theme":1,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":229,"A":{"a":75,"d":8,"p":14,"n":97,"pct":77},"B":{"a":111,"d":8,"p":13,"n":132,"pct":84},"gap":7,"minAgree":77,"consensus":0},"source":"Open Poll","tags":["Governance & Decision-making"],"inReport":false},{"id":"p24","kind":"poll","text":"When Oregon decides how to expand AI access or manage its risks, rural communities and lower-income neighborhoods should be fully involved — not an afterthought.","theme":1,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":216,"A":{"a":90,"d":3,"p":6,"n":99,"pct":91},"B":{"a":110,"d":2,"p":5,"n":117,"pct":94},"gap":3,"minAgree":91,"consensus":1},"source":"Open Poll","tags":["Governance & Decision-making"],"inReport":false},{"id":"p35","kind":"poll","text":"Data centers bring good-paying jobs and tax revenue to Central Oregon communities that need economic growth.","theme":2,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":230,"A":{"a":1,"d":94,"p":7,"n":102,"pct":1},"B":{"a":54,"d":39,"p":35,"n":128,"pct":42},"gap":41,"minAgree":1,"consensus":0},"source":"Open Poll","tags":["Data Centers"],"inReport":false},{"id":"p38","kind":"poll","text":"Small businesses in Central Oregon should get free AI training so they are not left behind by bigger companies that can afford it.","theme":5,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":243,"A":{"a":43,"d":41,"p":24,"n":108,"pct":40},"B":{"a":82,"d":28,"p":25,"n":135,"pct":61},"gap":21,"minAgree":40,"consensus":0},"source":"Open Poll","tags":["Economic Benefit"],"inReport":false},{"id":"p39","kind":"poll","text":"AI companies should be held legally responsible when their products cause real harm to people, just like a doctor or building contractor.","theme":1,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":222,"A":{"a":98,"d":1,"p":2,"n":101,"pct":97},"B":{"a":92,"d":13,"p":16,"n":121,"pct":76},"gap":21,"minAgree":76,"consensus":0},"source":"Open Poll","tags":["AI Companies","Governance & Decision-making"],"inReport":false},{"id":"p42","kind":"poll","text":"The Confederated Tribes of Warm Springs should have a formal seat at the table when Central Oregon leaders make decisions about AI.","theme":1,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":210,"A":{"a":89,"d":4,"p":5,"n":98,"pct":91},"B":{"a":101,"d":3,"p":8,"n":112,"pct":90},"gap":1,"minAgree":90,"consensus":1},"source":"Open Poll","tags":["Governance & Decision-making"],"inReport":false},{"id":"p43","kind":"poll","text":"AI tools are already helping ordinary people do things that used to require expensive professionals.","theme":7,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":243,"A":{"a":43,"d":54,"p":16,"n":113,"pct":38},"B":{"a":106,"d":8,"p":16,"n":130,"pct":82},"gap":44,"minAgree":38,"consensus":0},"source":"Open Poll","tags":[],"inReport":false},{"id":"p44","kind":"poll","text":"The more Central Oregon residents rely on AI for advice, connection, and even companionship, the less they will turn to each other.","theme":4,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":231,"A":{"a":89,"d":11,"p":5,"n":105,"pct":85},"B":{"a":62,"d":33,"p":31,"n":126,"pct":49},"gap":36,"minAgree":49,"consensus":0},"source":"Open Poll","tags":[],"inReport":false},{"id":"p46","kind":"poll","text":"AI is more than one thing, and we should not govern all forms of AI the same way","theme":1,"origin":"participant","place":"Sisters","chips":["SISTERS, OR","Not Provided"],"vote":{"total":216,"A":{"a":66,"d":21,"p":13,"n":100,"pct":66},"B":{"a":101,"d":4,"p":11,"n":116,"pct":87},"gap":21,"minAgree":66,"consensus":0},"source":"Open Poll","tags":["Governance & Decision-making"],"inReport":false},{"id":"p48","kind":"poll","text":"AI Companies -- like NVIDIA -- sending ambassadors to Oregon universities will give our students a leg up in the job market.","theme":5,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":219,"A":{"a":3,"d":67,"p":31,"n":101,"pct":3},"B":{"a":66,"d":6,"p":46,"n":118,"pct":56},"gap":53,"minAgree":3,"consensus":0},"source":"Open Poll","tags":["Youth","Workforce / Labor"],"inReport":false},{"id":"p49","kind":"poll","text":"AI for children is fine – it just needs to engage students in ways that don't make it addictive.","theme":3,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":221,"A":{"a":3,"d":92,"p":10,"n":105,"pct":3},"B":{"a":42,"d":49,"p":25,"n":116,"pct":36},"gap":33,"minAgree":3,"consensus":0},"source":"Open Poll","tags":["Youth"],"inReport":false},{"id":"p50","kind":"poll","text":"A small increase in power costs is worth it if we can get a lot of tax revenue out of new data centers.","theme":2,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":201,"A":{"a":0,"d":87,"p":6,"n":93,"pct":0},"B":{"a":31,"d":49,"p":28,"n":108,"pct":29},"gap":29,"minAgree":0,"consensus":0},"source":"Open Poll","tags":["Data Centers","Economic Benefit"],"inReport":false},{"id":"p51","kind":"poll","text":"I trust our local and regional government officials to make the right decisions on new data centers – they are best positioned to make decisions that benefit everyone.","theme":2,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":189,"A":{"a":2,"d":88,"p":4,"n":94,"pct":2},"B":{"a":15,"d":61,"p":19,"n":95,"pct":16},"gap":14,"minAgree":2,"consensus":-1},"source":"Open Poll","tags":["Data Centers","Governance & Decision-making"],"inReport":false},{"id":"p52","kind":"poll","text":"The changes coming with AI are inevitable. We should be learning to adapt, not trying to stop it.","theme":6,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":239,"A":{"a":12,"d":86,"p":12,"n":110,"pct":11},"B":{"a":94,"d":16,"p":19,"n":129,"pct":73},"gap":62,"minAgree":11,"consensus":0},"source":"Open Poll","tags":[],"inReport":false},{"id":"p53","kind":"poll","text":"I would be fine with AI-related unemployment as long as Oregon had a better a better social safety net.","theme":5,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":196,"A":{"a":9,"d":65,"p":21,"n":95,"pct":9},"B":{"a":34,"d":34,"p":33,"n":101,"pct":34},"gap":25,"minAgree":9,"consensus":0},"source":"Open Poll","tags":["Workforce / Labor"],"inReport":false},{"id":"p54","kind":"poll","text":"The jobs being replaced by AI weren’t that essential to begin with. Let’s find more meaningful work for those affected.","theme":5,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":184,"A":{"a":5,"d":77,"p":7,"n":89,"pct":6},"B":{"a":20,"d":49,"p":26,"n":95,"pct":21},"gap":15,"minAgree":6,"consensus":0},"source":"Open Poll","tags":["Workforce / Labor"],"inReport":false},{"id":"p55","kind":"poll","text":"Big corporations that are cutting jobs should be required to pay for their employees' retraining, instead of that cost falling on the government.","theme":5,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":230,"A":{"a":87,"d":5,"p":11,"n":103,"pct":84},"B":{"a":72,"d":29,"p":26,"n":127,"pct":57},"gap":27,"minAgree":57,"consensus":0},"source":"Open Poll","tags":["Workforce / Labor"],"inReport":false},{"id":"p56","kind":"poll","text":"Slowing down AI in Oregon means the jobs will just go to another state.","theme":5,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":217,"A":{"a":4,"d":79,"p":19,"n":102,"pct":4},"B":{"a":59,"d":27,"p":29,"n":115,"pct":51},"gap":47,"minAgree":4,"consensus":0},"source":"Open Poll","tags":[],"inReport":false},{"id":"p57","kind":"poll","text":"I don't think parents should be able to monitor their teenagers' chat logs in ChatGPT, etc – it's an invasion of privacy.","theme":8,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":183,"A":{"a":6,"d":70,"p":12,"n":88,"pct":7},"B":{"a":7,"d":72,"p":16,"n":95,"pct":7},"gap":0,"minAgree":7,"consensus":-1},"source":"Open Poll","tags":["Youth"],"inReport":false},{"id":"p58","kind":"poll","text":"We're still learning of the effects of social media on our health. We shouldn't be giving kids more tools until we've figured that out.","theme":3,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":231,"A":{"a":97,"d":1,"p":5,"n":103,"pct":94},"B":{"a":77,"d":29,"p":22,"n":128,"pct":60},"gap":34,"minAgree":60,"consensus":0},"source":"Open Poll","tags":["Youth"],"inReport":false},{"id":"p59","kind":"poll","text":"There should be no regulation of any kind on AI. Let the free market determine how it will be applied.","theme":1,"origin":"participant","place":"Prineville","chips":["PRINEVILLE, OR","55-64","FEMALE","WHITE OR CAUCASIAN","NO PARTY PREFERENCE / INDEPENDENT"],"vote":{"total":174,"A":{"a":2,"d":82,"p":3,"n":87,"pct":2},"B":{"a":5,"d":79,"p":3,"n":87,"pct":6},"gap":4,"minAgree":2,"consensus":-1},"source":"Open Poll","tags":["AI Companies","Governance & Decision-making"],"inReport":false},{"id":"p60","kind":"poll","text":"Powerful AI could pose risks to humanity’s long-term survival, and Oregon should take that possibility seriously even when it feels remote.","theme":6,"origin":"participant","place":"Bend","chips":["BEND, OR","Not Provided"],"vote":{"total":240,"A":{"a":97,"d":4,"p":6,"n":107,"pct":91},"B":{"a":80,"d":33,"p":20,"n":133,"pct":60},"gap":31,"minAgree":60,"consensus":0},"source":"Open Poll","tags":["Existential Risk"],"inReport":false},{"id":"p61","kind":"poll","text":"Concerns that AI could threaten humanity’s survival are overblown and distract from the real ways AI is affecting people in Oregon right now","theme":6,"origin":"participant","place":"Bend","chips":["BEND, OR","Not Provided"],"vote":{"total":235,"A":{"a":10,"d":85,"p":17,"n":112,"pct":9},"B":{"a":66,"d":32,"p":25,"n":123,"pct":54},"gap":45,"minAgree":9,"consensus":0},"source":"Open Poll","tags":["Existential Risk"],"inReport":false},{"id":"p62","kind":"poll","text":"Companies building the most powerful AI systems should be required to show they can prevent catastrophic outcomes before deploying them.","theme":6,"origin":"participant","place":"Bend","chips":["BEND, OR","Not Provided"],"vote":{"total":209,"A":{"a":92,"d":3,"p":3,"n":98,"pct":94},"B":{"a":87,"d":7,"p":17,"n":111,"pct":78},"gap":16,"minAgree":78,"consensus":0},"source":"Open Poll","tags":["AI Companies","Existential Risk"],"inReport":false},{"id":"p63","kind":"poll","text":"There needs to be more education on AI for the general public before many of these statements can be addressed. In using social media anymore there is no way to know if what I am reading/seeing is real or AI so I don't trust it anymore.","theme":7,"origin":"participant","place":"Bend","chips":["BEND, OR","65+","FEMALE","WHITE OR CAUCASIAN","NO PARTY PREFERENCE / INDEPENDENT"],"vote":{"total":184,"A":{"a":76,"d":7,"p":7,"n":90,"pct":84},"B":{"a":78,"d":10,"p":6,"n":94,"pct":83},"gap":1,"minAgree":83,"consensus":1},"source":"Open Poll","tags":["Public Education","News & (mis)information"],"inReport":false},{"id":"p64","kind":"poll","text":"AI fundamentally restructures the foundations of capitalism. All training data for AI is either other people's intellectual property or in the public domain. Therefore, AI should be publicly owned only. No private ownership.","theme":1,"origin":"participant","place":"Bend","chips":["BEND, OR","Not Provided"],"vote":{"total":186,"A":{"a":77,"d":2,"p":16,"n":95,"pct":81},"B":{"a":34,"d":27,"p":30,"n":91,"pct":37},"gap":44,"minAgree":37,"consensus":0},"source":"Open Poll","tags":["Government / Public Sector","Governance & Decision-making"],"inReport":false},{"id":"p65","kind":"poll","text":"We need transparency from governments (city and county) on AI usage, from office software to data centers, and a willingness of government officials to listen and scale back AI usage if asked to.","theme":1,"origin":"participant","place":"Powell Butte","chips":["POWELL BUTTE, OR","18-24","FEMALE","WHITE OR CAUCASIAN"],"vote":{"total":171,"A":{"a":82,"d":2,"p":4,"n":88,"pct":93},"B":{"a":63,"d":11,"p":9,"n":83,"pct":76},"gap":17,"minAgree":76,"consensus":0},"source":"Open Poll","tags":["Government / Public Sector"],"inReport":false},{"id":"p67","kind":"poll","text":"AI often provides inaccurate information (occasionally harmfully). While it could be viewed as useful, most students use it as a crutch more than a tool that ends up negatively impacting their ability to think critically and problem solve.","theme":3,"origin":"participant","place":"Sisters","chips":["SISTERS, OR","25-34","OTHER","WHITE OR CAUCASIAN","DEMOCRAT / PROGRESSIVE / LIBERAL"],"vote":{"total":142,"A":{"a":71,"d":1,"p":2,"n":74,"pct":96},"B":{"a":37,"d":8,"p":23,"n":68,"pct":54},"gap":42,"minAgree":54,"consensus":0},"source":"Open Poll","tags":["Education"],"inReport":false},{"id":"p68","kind":"poll","text":"I don’t think AI has benefits that outweigh the environmental and social repercussions of computer-based control over our lives and information. Taxing tech companies to neutralize their profits on AI and using proceeds to fund public needs","theme":2,"origin":"participant","place":"Prineville","chips":["PRINEVILLE, OR","Not Provided"],"vote":{"total":132,"A":{"a":62,"d":1,"p":9,"n":72,"pct":86},"B":{"a":17,"d":16,"p":27,"n":60,"pct":28},"gap":58,"minAgree":28,"consensus":0},"source":"Open Poll","tags":["Environment"],"inReport":false},{"id":"p70","kind":"poll","text":"This will all be done through education. The only way to mitigate risks or take fear out of something is to educate. Providing opportunities for education is what we've got to focus on.","theme":7,"origin":"participant","place":"Bend","chips":["BEND, OR","55-64","MALE","WHITE OR CAUCASIAN","NO PARTY PREFERENCE / INDEPENDENT"],"vote":{"total":125,"A":{"a":18,"d":25,"p":25,"n":68,"pct":26},"B":{"a":44,"d":5,"p":8,"n":57,"pct":77},"gap":51,"minAgree":26,"consensus":0},"source":"Open Poll","tags":["Public Education"],"inReport":false},{"id":"p71","kind":"poll","text":"We should not be using children as guinea pigs when it comes to AI. Allowing them to use these tools without guardrails has serious short and long-term risks.","theme":3,"origin":"participant","place":"Sisters","chips":["SISTERS, OR","35-44","MALE","WHITE OR CAUCASIAN","DEMOCRAT / PROGRESSIVE / LIBERAL"],"vote":{"total":135,"A":{"a":71,"d":0,"p":2,"n":73,"pct":97},"B":{"a":55,"d":1,"p":6,"n":62,"pct":89},"gap":8,"minAgree":89,"consensus":1},"source":"Open Poll","tags":["Youth"],"inReport":false},{"id":"p72","kind":"poll","text":"We need stronger transparency around how AI is being used in the education system – by teachers, administrators, and students.","theme":3,"origin":"participant","place":"Sisters","chips":["SISTERS, OR","35-44","MALE","WHITE OR CAUCASIAN","DEMOCRAT / PROGRESSIVE / LIBERAL"],"vote":{"total":127,"A":{"a":67,"d":1,"p":2,"n":70,"pct":96},"B":{"a":52,"d":1,"p":4,"n":57,"pct":91},"gap":5,"minAgree":91,"consensus":1},"source":"Open Poll","tags":["Education"],"inReport":false},{"id":"p73","kind":"poll","text":"Central Oregon has massive disparities in AI literacy. We need to help get everyone up to speed on the risks and opportunities AI poses to our communities.","theme":7,"origin":"participant","place":"Sisters","chips":["SISTERS, OR","35-44","MALE","WHITE OR CAUCASIAN","DEMOCRAT / PROGRESSIVE / LIBERAL"],"vote":{"total":124,"A":{"a":34,"d":13,"p":21,"n":68,"pct":50},"B":{"a":49,"d":0,"p":7,"n":56,"pct":88},"gap":38,"minAgree":50,"consensus":0},"source":"Open Poll","tags":["Public Education"],"inReport":false},{"id":"p74","kind":"poll","text":"The best solutions are education and regulation.","theme":7,"origin":"participant","place":"Sisters","chips":["SISTERS, OR","Not Provided"],"vote":{"total":131,"A":{"a":46,"d":11,"p":15,"n":72,"pct":64},"B":{"a":41,"d":8,"p":10,"n":59,"pct":69},"gap":5,"minAgree":64,"consensus":0},"source":"Open Poll","tags":["Public Education"],"inReport":false},{"id":"p75","kind":"poll","text":"AI is already causing major issues by providing false information and people are relying upon it. There needs to be some sort of federal check.","theme":7,"origin":"participant","place":"Sisters","chips":["SISTERS, OR","55-64","FEMALE","WHITE OR CAUCASIAN","DEMOCRAT / PROGRESSIVE / LIBERAL"],"vote":{"total":130,"A":{"a":58,"d":4,"p":6,"n":68,"pct":85},"B":{"a":32,"d":15,"p":15,"n":62,"pct":52},"gap":33,"minAgree":52,"consensus":0},"source":"Open Poll","tags":["News & (mis)information"],"inReport":false},{"id":"p76","kind":"poll","text":"AI is taking money and opportunity from artists, writers, musicians, and thinkers. It’s taking brain cells from our children.","theme":3,"origin":"participant","place":"Sisters","chips":["SISTERS, OR","Not Provided"],"vote":{"total":133,"A":{"a":71,"d":3,"p":1,"n":75,"pct":95},"B":{"a":24,"d":21,"p":13,"n":58,"pct":41},"gap":54,"minAgree":41,"consensus":0},"source":"Open Poll","tags":["Education"],"inReport":false},{"id":"p77","kind":"poll","text":"AI is an opportunity to connect people across demographics and cultures to collaborate on how we can leverage the potential for good.","theme":4,"origin":"participant","place":"Sisters","chips":["SISTERS, OR","35-44","FEMALE","WHITE OR CAUCASIAN","DEMOCRAT / PROGRESSIVE / LIBERAL"],"vote":{"total":125,"A":{"a":7,"d":41,"p":17,"n":65,"pct":11},"B":{"a":41,"d":6,"p":13,"n":60,"pct":68},"gap":57,"minAgree":11,"consensus":0},"source":"Open Poll","tags":["Positive Effects"],"inReport":false},{"id":"p78","kind":"poll","text":"I think the human species is not evolved enough to be able to for see the effects this technology could have on humanity. It is unfortunate that we have the ability to create it.","theme":6,"origin":"participant","place":"Sisters","chips":["SISTERS, OR","Not Provided"],"vote":{"total":130,"A":{"a":58,"d":5,"p":7,"n":70,"pct":83},"B":{"a":15,"d":31,"p":14,"n":60,"pct":25},"gap":58,"minAgree":25,"consensus":0},"source":"Open Poll","tags":["Existential Risk"],"inReport":false},{"id":"p79","kind":"poll","text":"Companies shouldn’t get tax breaks for using AI","theme":5,"origin":"participant","place":"Redmond","chips":["REDMOND, OR","Not Provided"],"vote":{"total":122,"A":{"a":61,"d":5,"p":1,"n":67,"pct":91},"B":{"a":44,"d":5,"p":6,"n":55,"pct":80},"gap":11,"minAgree":80,"consensus":1},"source":"Open Poll","tags":["Workforce / Labor","Economic Benefit"],"inReport":false},{"id":"p80","kind":"poll","text":"AI tech companies are moving too fast. I use Anthropic's Claude and find it to be beneficial in many ways. But I do not trust other companies that may be more interested in control, power and financial gain.","theme":6,"origin":"participant","place":"Powell Butte","chips":["POWELL BUTTE, OR","65+","FEMALE","WHITE OR CAUCASIAN","DEMOCRAT / PROGRESSIVE / LIBERAL"],"vote":{"total":111,"A":{"a":36,"d":4,"p":18,"n":58,"pct":62},"B":{"a":28,"d":14,"p":11,"n":53,"pct":53},"gap":9,"minAgree":53,"consensus":0},"source":"Open Poll","tags":["Workforce / Labor"],"inReport":false},{"id":"p81","kind":"poll","text":"AI is being used by youth, aging workforce should be trained to create a smooth transition to the incoming workforce.","theme":5,"origin":"participant","place":"Warm Springs","chips":["WARM SPRINGS, OR","35-44","MALE","NATIVE AMERICAN","DEMOCRAT / PROGRESSIVE / LIBERAL"],"vote":{"total":105,"A":{"a":10,"d":33,"p":16,"n":59,"pct":17},"B":{"a":26,"d":1,"p":19,"n":46,"pct":57},"gap":40,"minAgree":17,"consensus":0},"source":"Open Poll","tags":["Youth","Workforce / Labor"],"inReport":false},{"id":"p86","kind":"poll","text":"AI if so great should already be intuitive and not need training beyond a basuc online youtube - free. It should be able to create its own training.","theme":7,"origin":"participant","place":"Bend","chips":["BEND, OR","Not Provided"],"vote":{"total":84,"A":{"a":5,"d":28,"p":19,"n":52,"pct":10},"B":{"a":3,"d":20,"p":9,"n":32,"pct":9},"gap":1,"minAgree":9,"consensus":-1},"source":"Open Poll","tags":["Public Education"],"inReport":false},{"id":"p88","kind":"poll","text":"Using Ai instead of a person (which would help the economy), benefit$ a small group of companies that have tax breaks (doesn't benefit econ/community), takes - not provides jobs for uninspired results.","theme":5,"origin":"participant","place":"Bend","chips":["BEND, OR","Not Provided"],"vote":{"total":100,"A":{"a":49,"d":3,"p":6,"n":58,"pct":84},"B":{"a":11,"d":12,"p":19,"n":42,"pct":26},"gap":58,"minAgree":26,"consensus":0},"source":"Open Poll","tags":["Economic Benefit","Distribution of Public Benefits"],"inReport":false},{"id":"p89","kind":"poll","text":"Data centers bring temporary construction jobs, use out of state contractors (worked at one), gives a temporary housing shortage (thousands of workers that leave) and VERY few jobs once running. It is monitoring temperature.","theme":2,"origin":"participant","place":"Bend","chips":["BEND, OR","Not Provided"],"vote":{"total":96,"A":{"a":49,"d":1,"p":5,"n":55,"pct":89},"B":{"a":22,"d":4,"p":15,"n":41,"pct":54},"gap":35,"minAgree":54,"consensus":0},"source":"Open Poll","tags":["Data Centers"],"inReport":false},{"id":"p100","kind":"poll","text":"Cities and counties should continue to give huge tax breaks and limit existing regulations so data centers can be built in their area.","theme":2,"origin":"participant","place":"Bend","chips":["BEND, OR","65+","FEMALE","WHITE OR CAUCASIAN","NO PARTY PREFERENCE / INDEPENDENT"],"vote":{"total":77,"A":{"a":2,"d":45,"p":0,"n":47,"pct":4},"B":{"a":1,"d":27,"p":2,"n":30,"pct":3},"gap":1,"minAgree":3,"consensus":-1},"source":"Open Poll","tags":["Data Centers","Government / Public Sector","Economic Benefit"],"inReport":false},{"id":"p101","kind":"poll","text":"I don't think we really know what AI is. It means different things to different people, and on a very superficial level.","theme":7,"origin":"participant","place":"Bend","chips":["BEND, OR","55-64","MALE","WHITE OR CAUCASIAN","REPUBLICAN / CONSERVATIVE"],"vote":{"total":83,"A":{"a":32,"d":10,"p":7,"n":49,"pct":65},"B":{"a":18,"d":11,"p":5,"n":34,"pct":53},"gap":12,"minAgree":53,"consensus":0},"source":"Open Poll","tags":["Public Education"],"inReport":false},{"id":"p103","kind":"poll","text":"As a former educator, I am very concerned about how AI is changing the ability of our students to write. It is easy to search for facts, but much harder to evaluate the quality of the info and then present a coherent analysis.","theme":3,"origin":"participant","place":"Bend","chips":["BEND, OR","65+","FEMALE","WHITE OR CAUCASIAN","REPUBLICAN / CONSERVATIVE"],"vote":{"total":91,"A":{"a":51,"d":0,"p":1,"n":52,"pct":98},"B":{"a":31,"d":1,"p":7,"n":39,"pct":79},"gap":19,"minAgree":79,"consensus":0},"source":"Open Poll","tags":["Education"],"inReport":false},{"id":"p106","kind":"poll","text":"Fix the corporate tax structure and don't worry about adding more displaced worker programs. We already have unemployment insurance and worker training.","theme":5,"origin":"participant","place":"Bend","chips":["BEND, OR","65+","FEMALE","WHITE OR CAUCASIAN","REPUBLICAN / CONSERVATIVE"],"vote":{"total":77,"A":{"a":7,"d":20,"p":20,"n":47,"pct":15},"B":{"a":9,"d":11,"p":10,"n":30,"pct":30},"gap":15,"minAgree":15,"consensus":0},"source":"Open Poll","tags":["Workforce / Labor","Distribution of Public Benefits"],"inReport":false},{"id":"p109","kind":"poll","text":"I'm not sure Oregon should continue giving tax breaks to AI companies that use increasingly scarce resources like water.","theme":2,"origin":"participant","place":"Bend","chips":["BEND, OR","65+","FEMALE","WHITE OR CAUCASIAN","REPUBLICAN / CONSERVATIVE"],"vote":{"total":88,"A":{"a":48,"d":2,"p":1,"n":51,"pct":94},"B":{"a":26,"d":5,"p":6,"n":37,"pct":70},"gap":24,"minAgree":70,"consensus":0},"source":"Open Poll","tags":["Environment","Economic Benefit"],"inReport":false},{"id":"p111","kind":"poll","text":"Allowing teens to maintain privacy has to be balanced with safety. I trust counselors and teachers to balance those two values much more than I trust an AI chatbot. Some queries should just shut down the bot and direct the teen to a person","theme":8,"origin":"participant","place":"Bend","chips":["BEND, OR","65+","FEMALE","WHITE OR CAUCASIAN","REPUBLICAN / CONSERVATIVE"],"vote":{"total":94,"A":{"a":45,"d":1,"p":6,"n":52,"pct":87},"B":{"a":33,"d":3,"p":6,"n":42,"pct":79},"gap":8,"minAgree":79,"consensus":0},"source":"Open Poll","tags":["Youth"],"inReport":false},{"id":"p112","kind":"poll","text":"Insist that governments use AI to help them make transit more successful","theme":1,"origin":"participant","place":"Bend","chips":["BEND, OR","65+","MALE","WHITE OR CAUCASIAN"],"vote":{"total":73,"A":{"a":2,"d":31,"p":12,"n":45,"pct":4},"B":{"a":11,"d":6,"p":11,"n":28,"pct":39},"gap":35,"minAgree":4,"consensus":0},"source":"Open Poll","tags":["Governance & Decision-making"],"inReport":false},{"id":"p114","kind":"poll","text":"Prolific AI use is causing us to lose cognitive and creative abilities at a rapid rate. While all new technology improves our lives in various ways, we are giving up more than we are gaining with AI.","theme":3,"origin":"participant","place":"Madras","chips":["MADRAS, OR","45-54","FEMALE","WHITE OR CAUCASIAN","NO PARTY PREFERENCE / INDEPENDENT"],"vote":{"total":33,"A":{"a":13,"d":0,"p":4,"n":17,"pct":76},"B":{"a":1,"d":8,"p":7,"n":16,"pct":6},"gap":70,"minAgree":6,"consensus":0},"source":"Open Poll","tags":["Education"],"inReport":false},{"id":"p115","kind":"poll","text":"The environmental cost of being more data centers to Central Oregon will outweigh the benefits.","theme":2,"origin":"participant","place":"Madras","chips":["MADRAS, OR","45-54","FEMALE","WHITE OR CAUCASIAN","NO PARTY PREFERENCE / INDEPENDENT"],"vote":{"total":34,"A":{"a":17,"d":0,"p":1,"n":18,"pct":94},"B":{"a":5,"d":2,"p":9,"n":16,"pct":31},"gap":63,"minAgree":31,"consensus":0},"source":"Open Poll","tags":["Environment"],"inReport":false},{"id":"p116","kind":"poll","text":"The costs far out weigh any perceived potential benefit to the commonplace","theme":1,"origin":"participant","place":"Madras","chips":["MADRAS, OR","Not Provided"],"vote":{"total":35,"A":{"a":15,"d":0,"p":3,"n":18,"pct":83},"B":{"a":1,"d":9,"p":7,"n":17,"pct":6},"gap":77,"minAgree":6,"consensus":0},"source":"Open Poll","tags":["Distribution of Public Benefits"],"inReport":false},{"id":"p117","kind":"poll","text":"AI is a tool, just like any other. Tools can be used for harm or good, depending on the user.","theme":6,"origin":"participant","place":"Bend","chips":["BEND, OR","Not Provided"],"vote":{"total":39,"A":{"a":10,"d":7,"p":1,"n":18,"pct":56},"B":{"a":19,"d":0,"p":2,"n":21,"pct":90},"gap":34,"minAgree":56,"consensus":0},"source":"Open Poll","tags":[],"inReport":false},{"id":"p118","kind":"poll","text":"While there are many situations in which AI can be a benefit, I can see that using AI can lead to us forgetting how to think for ourselves, because AI is quick and convenient. That's a huge risk in our education system.","theme":3,"origin":"participant","place":"Bend","chips":["BEND, OR","65+","FEMALE","WHITE OR CAUCASIAN","DEMOCRAT / PROGRESSIVE / LIBERAL"],"vote":{"total":41,"A":{"a":20,"d":0,"p":0,"n":20,"pct":100},"B":{"a":17,"d":3,"p":1,"n":21,"pct":81},"gap":19,"minAgree":81,"consensus":1},"source":"Open Poll","tags":["Education","Existential Risk"],"inReport":false},{"id":"p119","kind":"poll","text":"In the software industry, AI is creating so much new code so quickly that more software developers will be needed, not fewer.","theme":5,"origin":"participant","place":"Bend","chips":["BEND, OR","Not Provided"],"vote":{"total":31,"A":{"a":5,"d":3,"p":6,"n":14,"pct":36},"B":{"a":6,"d":7,"p":4,"n":17,"pct":35},"gap":1,"minAgree":35,"consensus":0},"source":"Open Poll","tags":["Workforce / Labor"],"inReport":false},{"id":"p120","kind":"poll","text":"AI is a tool like many others we use daily. It will be used for good and bad, will change the way we work, but should not be viewed as a replacement for people. But, the work we do will change as a result of it.","theme":5,"origin":"participant","place":"Redmond","chips":["REDMOND, OR","55-64","MALE","WHITE OR CAUCASIAN","REPUBLICAN / CONSERVATIVE"],"vote":{"total":38,"A":{"a":14,"d":1,"p":4,"n":19,"pct":74},"B":{"a":18,"d":0,"p":1,"n":19,"pct":95},"gap":21,"minAgree":74,"consensus":0},"source":"Open Poll","tags":["Workforce / Labor"],"inReport":false},{"id":"p121","kind":"poll","text":"AI should sharpen human judgment, not substitute for it. If we let it think for us instead of improving us, we trade agency for convenience. The risk is that we will choose the \"easy button\" temptation of AI over improving ones thinking.","theme":6,"origin":"participant","place":"Redmond","chips":["REDMOND, OR","65+","MALE","WHITE OR CAUCASIAN","NO PARTY PREFERENCE / INDEPENDENT"],"vote":{"total":40,"A":{"a":16,"d":0,"p":1,"n":17,"pct":94},"B":{"a":22,"d":0,"p":1,"n":23,"pct":96},"gap":2,"minAgree":94,"consensus":1},"source":"Open Poll","tags":["Existential Risk"],"inReport":false},{"id":"p122","kind":"poll","text":"We should not blindly trust developers, promoters of AI. The Pope is correct in saying \"AI should be disarmed.\"","theme":1,"origin":"participant","place":"Bend","chips":["BEND, OR","65+","MALE","WHITE OR CAUCASIAN","DEMOCRAT / PROGRESSIVE / LIBERAL"],"vote":{"total":38,"A":{"a":18,"d":0,"p":1,"n":19,"pct":95},"B":{"a":13,"d":2,"p":4,"n":19,"pct":68},"gap":27,"minAgree":68,"consensus":0},"source":"Open Poll","tags":["Governance & Decision-making"],"inReport":false},{"id":"p123","kind":"poll","text":"There should be no tax credits for AI data centers - these centers raise everyone's electric bill, create very few jobs and their usefulness is up for debate. The people of Oregon shouldn't be giving these billionaires a tax break","theme":5,"origin":"participant","place":"Bend","chips":["BEND, OR","25-34","MALE","WHITE OR CAUCASIAN"],"vote":{"total":39,"A":{"a":20,"d":0,"p":0,"n":20,"pct":100},"B":{"a":13,"d":2,"p":4,"n":19,"pct":68},"gap":32,"minAgree":68,"consensus":0},"source":"Open Poll","tags":["Economic Benefit"],"inReport":false},{"id":"p125","kind":"poll","text":"Efforts need to be made to get more women involved in controlling AI. Leaving AI power to only the TechBros is what got our world in the mess it is now.","theme":1,"origin":"participant","place":"Bend","chips":["BEND, OR","65+","FEMALE","WHITE OR CAUCASIAN"],"vote":{"total":32,"A":{"a":12,"d":2,"p":2,"n":16,"pct":75},"B":{"a":7,"d":3,"p":6,"n":16,"pct":44},"gap":31,"minAgree":44,"consensus":0},"source":"Open Poll","tags":["Governance & Decision-making"],"inReport":false},{"id":"p127","kind":"poll","text":"AI does provide benefits - so much so, that I don't see society putting that genie back in the bottle - but I also think that taxation and regulation of the tech companies creating AI are equally important.","theme":1,"origin":"participant","place":"Bend","chips":["BEND, OR","55-64","FEMALE","WHITE OR CAUCASIAN","DEMOCRAT / PROGRESSIVE / LIBERAL"],"vote":{"total":34,"A":{"a":11,"d":3,"p":3,"n":17,"pct":65},"B":{"a":15,"d":1,"p":1,"n":17,"pct":88},"gap":23,"minAgree":65,"consensus":0},"source":"Open Poll","tags":[],"inReport":false},{"id":"p128","kind":"poll","text":"Data center development requires fair, methodical, and unhurried environmental and community review. I would not want to live next to a 5000 acre data center campus that competes with humans and wildlife for water and raises my energy bill.","theme":2,"origin":"participant","place":"Bend","chips":["BEND, OR","55-64","FEMALE","WHITE OR CAUCASIAN","DEMOCRAT / PROGRESSIVE / LIBERAL"],"vote":{"total":39,"A":{"a":18,"d":0,"p":1,"n":19,"pct":95},"B":{"a":19,"d":0,"p":1,"n":20,"pct":95},"gap":0,"minAgree":95,"consensus":1},"source":"Open Poll","tags":["Data Centers","Governance & Decision-making","Environment"],"inReport":false},{"id":"p130","kind":"poll","text":"AI companies should not receive “liability shields” from lawsuits that stem from negative environmental or health effects that arise from the construction and operation of data centers. They need to pay for negative side effects.","theme":2,"origin":"participant","place":"Culver","chips":["CULVER, OR","35-44","MALE","WHITE OR CAUCASIAN","REPUBLICAN / CONSERVATIVE"],"vote":{"total":40,"A":{"a":22,"d":0,"p":0,"n":22,"pct":100},"B":{"a":13,"d":2,"p":3,"n":18,"pct":72},"gap":28,"minAgree":72,"consensus":0},"source":"Open Poll","tags":["AI Companies","Governance & Decision-making","Environment"],"inReport":false},{"id":"p131","kind":"poll","text":"There are too many lies and half-truths from AI companies and community leaders about the “job opportunities” that AI data centers will produce once built.","theme":2,"origin":"participant","place":"Culver","chips":["CULVER, OR","35-44","MALE","WHITE OR CAUCASIAN","REPUBLICAN / CONSERVATIVE"],"vote":{"total":40,"A":{"a":20,"d":0,"p":1,"n":21,"pct":95},"B":{"a":13,"d":2,"p":4,"n":19,"pct":68},"gap":27,"minAgree":68,"consensus":0},"source":"Open Poll","tags":["Data Centers","Workforce / Labor","Public Education"],"inReport":false},{"id":"p134","kind":"poll","text":"Every organization should implement an AI policy that protects company data and prevents confidential or proprietary information from being entered into generative AI tools.","theme":8,"origin":"participant","place":"Bend","chips":["BEND, OR","45-54","FEMALE","WHITE OR CAUCASIAN","NO PARTY PREFERENCE / INDEPENDENT"],"vote":{"total":36,"A":{"a":18,"d":0,"p":0,"n":18,"pct":100},"B":{"a":12,"d":1,"p":5,"n":18,"pct":67},"gap":33,"minAgree":67,"consensus":0},"source":"Open Poll","tags":[],"inReport":false},{"id":"p135","kind":"poll","text":"Tech workers in Oregon should form an Oregon Tech Workers Union to protect ourselves from AI related corporate layoffs, salary reductions, position eliminations, etc.","theme":5,"origin":"participant","place":"Bend","chips":["BEND, OR","35-44","MALE","WHITE OR CAUCASIAN","NO PARTY PREFERENCE / INDEPENDENT"],"vote":{"total":25,"A":{"a":9,"d":0,"p":6,"n":15,"pct":60},"B":{"a":3,"d":2,"p":5,"n":10,"pct":30},"gap":30,"minAgree":30,"consensus":0},"source":"Open Poll","tags":["AI Companies","Workforce / Labor"],"inReport":false},{"id":"p141","kind":"poll","text":"We need to prioritize building a rigorous, apolitical evidence base around AI's impact on many things- child development, worker outcomes, environmental impacts, social connection, professional interactions, research capabilities.","theme":7,"origin":"participant","place":"Sisters","chips":["SISTERS, OR","Not Provided"],"vote":{"total":29,"A":{"a":17,"d":0,"p":0,"n":17,"pct":100},"B":{"a":12,"d":0,"p":0,"n":12,"pct":100},"gap":0,"minAgree":100,"consensus":1},"source":"Open Poll","tags":["Public Education"],"inReport":false},{"id":"p142","kind":"poll","text":"While AI companies should be engaged in measuring the impact of their tools and responsive to government and community sentiment, it's not their job (alone) to find solutions. Many parts of society need to be part of shaping solutions.","theme":1,"origin":"participant","place":"Sisters","chips":["SISTERS, OR","Not Provided"],"vote":{"total":27,"A":{"a":8,"d":3,"p":2,"n":13,"pct":62},"B":{"a":12,"d":0,"p":2,"n":14,"pct":86},"gap":24,"minAgree":62,"consensus":0},"source":"Open Poll","tags":["AI Companies","Government / Public Sector","Governance & Decision-making"],"inReport":false},{"id":"p143","kind":"poll","text":"We don't yet know how to effectively regulate AI, but that shouldn't stop us from introducing any regulation or safeguards. We need to be trying good ideas, evaluating carefully, and create mechanisms that can evolve quickly.","theme":1,"origin":"participant","place":"Sisters","chips":["SISTERS, OR","Not Provided"],"vote":{"total":28,"A":{"a":12,"d":1,"p":1,"n":14,"pct":86},"B":{"a":13,"d":1,"p":0,"n":14,"pct":93},"gap":7,"minAgree":86,"consensus":1},"source":"Open Poll","tags":["Governance & Decision-making"],"inReport":false},{"id":"p144","kind":"poll","text":"Data centers are consuming huge amounts of limited resources and impacting many communities just so people can play with chatGPT or create fake photos that are entertaining for a minute or two. The cost is not worth the reward.","theme":2,"origin":"participant","place":"Bend","chips":["BEND, OR","55-64","FEMALE","WHITE OR CAUCASIAN","DEMOCRAT / PROGRESSIVE / LIBERAL"],"vote":{"total":1,"A":{"a":1,"d":0,"p":0,"n":1,"pct":100},"B":{"a":0,"d":0,"p":0,"n":0,"pct":0},"gap":100,"minAgree":0,"consensus":0},"source":"Open Poll","tags":["Data Centers"],"inReport":false},{"id":"p147","kind":"poll","text":"I hope AI’s potential when it is used to advance public good. I support AI if it helps address climate, water, health, education, and workforce challenges while protecting privacy, promoting fairness, and reducing environmental impacts.","theme":1,"origin":"participant","place":"Bend","chips":["BEND, OR","Not Provided"],"vote":{"total":21,"A":{"a":3,"d":4,"p":1,"n":8,"pct":38},"B":{"a":11,"d":0,"p":2,"n":13,"pct":85},"gap":47,"minAgree":38,"consensus":0},"source":"Open Poll","tags":[],"inReport":false},{"id":"p149","kind":"poll","text":"I would like to apply my grandmother‘s standard assessment regarding AI: Is it necessary? Is it fair? Does it hurt anybody or anything?","theme":1,"origin":"participant","place":"Sisters","chips":["SISTERS, OR","65+","MALE","WHITE OR CAUCASIAN","DEMOCRAT / PROGRESSIVE / LIBERAL"],"vote":{"total":1,"A":{"a":1,"d":0,"p":0,"n":1,"pct":100},"B":{"a":0,"d":0,"p":0,"n":0,"pct":0},"gap":100,"minAgree":0,"consensus":0},"source":"Open Poll","tags":["Governance & Decision-making"],"inReport":false},{"id":"p150","kind":"poll","text":"Community members' voices should be included when local leaders are making decisions on using AI in government.","theme":1,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":16,"A":{"a":5,"d":0,"p":0,"n":5,"pct":100},"B":{"a":10,"d":0,"p":1,"n":11,"pct":91},"gap":9,"minAgree":91,"consensus":1},"source":"Open Poll","tags":["Governance & Decision-making"],"inReport":false},{"id":"p151","kind":"poll","text":"I would volunteer to participate in a 3-day civic assembly to make recommendations on AI policy to local and state leaders.","theme":1,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":16,"A":{"a":4,"d":1,"p":0,"n":5,"pct":80},"B":{"a":5,"d":2,"p":4,"n":11,"pct":45},"gap":35,"minAgree":45,"consensus":0},"source":"Open Poll","tags":[],"inReport":false},{"id":"p152","kind":"poll","text":"I think about how AI affects my family and community on a weekly basis.","theme":1,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":14,"A":{"a":5,"d":0,"p":0,"n":5,"pct":100},"B":{"a":4,"d":4,"p":1,"n":9,"pct":44},"gap":56,"minAgree":44,"consensus":0},"source":"Open Poll","tags":[],"inReport":false},{"id":"p153","kind":"poll","text":"The most powerful AI models should be open so the public can inspect the code and prevent monopolies.","theme":1,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":15,"A":{"a":4,"d":0,"p":1,"n":5,"pct":80},"B":{"a":5,"d":3,"p":2,"n":10,"pct":50},"gap":30,"minAgree":50,"consensus":0},"source":"Open Poll","tags":["Governance & Decision-making"],"inReport":false},{"id":"p154","kind":"poll","text":"Keeping the code behind world's most powerful AI models private is a necessary safety measure to prevent bad actors from using the technology for harm.","theme":1,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":12,"A":{"a":1,"d":1,"p":2,"n":4,"pct":25},"B":{"a":2,"d":2,"p":4,"n":8,"pct":25},"gap":0,"minAgree":25,"consensus":0},"source":"Open Poll","tags":["Governance & Decision-making"],"inReport":false},{"id":"p155","kind":"poll","text":"AI companies should be required to watermark all synthetic content so that users can always distinguish between a real human and an AI-generated image or video.","theme":7,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":13,"A":{"a":4,"d":0,"p":0,"n":4,"pct":100},"B":{"a":6,"d":0,"p":3,"n":9,"pct":67},"gap":33,"minAgree":67,"consensus":0},"source":"Open Poll","tags":["News & (mis)information"],"inReport":false},{"id":"p156","kind":"poll","text":"Before being deployed in public sectors like law enforcement or healthcare, AI models must be independently audited to prove they do not have racial or gender biases.","theme":1,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":15,"A":{"a":5,"d":0,"p":0,"n":5,"pct":100},"B":{"a":7,"d":0,"p":3,"n":10,"pct":70},"gap":30,"minAgree":70,"consensus":0},"source":"Open Poll","tags":["Governance & Decision-making"],"inReport":false},{"id":"p157","kind":"poll","text":"Because AI is trained on historical data, it will inevitably reinforce existing societal prejudices unless we strictly regulate how that data is collected.","theme":7,"origin":"cocap_seed","place":null,"chips":["SEED STATEMENT"],"vote":{"total":13,"A":{"a":4,"d":0,"p":0,"n":4,"pct":100},"B":{"a":3,"d":1,"p":5,"n":9,"pct":33},"gap":67,"minAgree":33,"consensus":0},"source":"Open Poll","tags":[],"inReport":false},{"id":"p161","kind":"poll","text":"The AI industry seems to be moving too fast towards an uncertain outcome. We should not be subsiding building data centers with tax breaks. The downsides are just not worth it: noise, pollution, higher water and electric bills.","theme":2,"origin":"participant","place":"Bend","chips":["BEND, OR","Not Provided"],"vote":{"total":11,"A":{"a":4,"d":0,"p":0,"n":4,"pct":100},"B":{"a":6,"d":1,"p":0,"n":7,"pct":86},"gap":14,"minAgree":86,"consensus":1},"source":"Open Poll","tags":["Environment","Economic Benefit"],"inReport":false},{"id":"qbdf7a1e4","kind":"quote","text":"And I think that's a big part of the, the issue that people have and why people, you know, don't like data centers in part is because they just happen and then you find out about it later, right? So, continuing to be part of the discussion, I think is vital.","theme":2,"origin":"listening_session","place":null,"chips":["ONLINE A SESSION","JUN 4, 2026","ONLINE"],"vote":null,"source":"Listening session — Online A","tags":["decisionmaking","data centers"],"inReport":true},{"id":"q93c0d744","kind":"quote","text":"Like many things in politics, there's massive profit motives behind it, and I mean that's what's driving the stuff Jonathan's talking about, like the legislature had a solution to keep our data private, and then the Axon and Flock lobbyists came in and he was like, no, we need to strike that because we would need to have access to everybody's data, and they did. And so we can come up with the best, most functional solutions in the world, but then how do we actually get those to happen.","theme":1,"origin":"listening_session","place":null,"chips":["ONLINE A SESSION","JUN 4, 2026","ONLINE"],"vote":null,"source":"Listening session — Online A","tags":["decisionmaking","companies","public service"],"inReport":false},{"id":"q0fe7e7b8","kind":"quote","text":"And so what I would like to see, I don't want AI to be another one of those things that does that for us. Like I don't want AI to be another way where people are like finding friendship or companionship through that and just another thing where people are, are not spending time in person or with real people.","theme":4,"origin":"listening_session","place":null,"chips":["ONLINE B SESSION","JUN 9, 2026","ONLINE"],"vote":null,"source":"Listening session — Online B","tags":["social connection"],"inReport":true},{"id":"q8d1e7ae2","kind":"quote","text":"But also the storytelling that goes along with it, that is a part of our humanity, of sharing with one another. I mean, what we're doing in this room, um, is very different than if we were having, each one of us having a conversation with, with an AI, um.","theme":4,"origin":"listening_session","place":"Bend","chips":["BEND SESSION","JUN 6, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Bend","tags":["social connection"],"inReport":true},{"id":"qdb10c6a6","kind":"quote","text":"Building relationships with online, they'd rather talk to their chatbot than, than an adult, um, sometimes even their friends, because a chatbot will always be there for you. It, it will not push back against you, uh, unless you tell it specifically to tell, tell it to push back against you. Uh, but students don't instinctively know that, right?","theme":4,"origin":"listening_session","place":null,"chips":["ONLINE B SESSION","JUN 9, 2026","ONLINE"],"vote":null,"source":"Listening session — Online B","tags":["children","social connection"],"inReport":true},{"id":"qe868a7e9","kind":"quote","text":"It was, it was, it was a nightmare trying to regulate the things that she was listening to or watching and then everything was.","theme":3,"origin":"listening_session","place":"Bend","chips":["BEND SESSION","JUN 6, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Bend","tags":["children"],"inReport":false},{"id":"q86644e17","kind":"quote","text":"We need to teach people to think and Piper really talked about that that we're not teaching kids to question we're teaching kids to be completely reliant and I think that's the problem is it's the double checking it's the, it's the question it's like kids will question authority but they won't question a computer. I'm like we need to teach the kids to question the computer,","theme":3,"origin":"listening_session","place":"Sisters","chips":["SISTERS SESSION","MAY 30, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Sisters","tags":["children","cognition"],"inReport":true},{"id":"qdc48b44a","kind":"quote","text":"The thinking on your own, the critical thinking on your own, that you do not wanna lose that. You wanna be able to take some information, formulate your your thought.","theme":3,"origin":"listening_session","place":"Bend","chips":["BEND SESSION","JUN 6, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Bend","tags":["cognition","agency","education"],"inReport":false},{"id":"qe092bd68","kind":"quote","text":"An experiential process and so if you take your group and you go outside and you go into the forest and you go to wherever, you know, what you learned in kindergarten is what you really, that was real learning. Uh-huh that's, that's teaching in a different way. That's a different set of experience, but you basically lecture about whatever. I, I'm a teacher. I was a teacher. I taught at college. I've taught, you know, Saint Francis. I mean, so I, I, I, I have a, an understanding of it, but.","theme":3,"origin":"listening_session","place":"Bend","chips":["BEND SESSION","JUN 6, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Bend","tags":["education"],"inReport":false},{"id":"q15e4f7dc","kind":"quote","text":"Um, and we're just magnifying it. So, when you have, uh, say, teachers who are taking in, um, AI and replacing the curriculum by, by just relying on this tool, well, AI is a supportive feature. And, and anytime that we step beyond using it supportively for what we're already doing into replacement, then that's when, that's when these bigger, that's when these bigger issues start to happen. And, and I don't know, that was, I think that's, that's where I wanted to answer the, the questions on the screen, which is, is like,","theme":3,"origin":"listening_session","place":null,"chips":["ONLINE B SESSION","JUN 9, 2026","ONLINE"],"vote":null,"source":"Listening session — Online B","tags":["education"],"inReport":true},{"id":"q227b95ee","kind":"quote","text":"You learn it today, and that's out of date tomorrow because a new model comes out. So people have had great reasons for not diving in, fear of the unknown, all the kind of human nature things. But I think we have to shed more light on how it's being used positively, and I'm thinking I'm going to probably do stories about that. There was a magazine from the street called The Power of AI, and it had all these bite-sized nuggets of all these fields, medicine and education, everything of things that were being done well with it.","theme":7,"origin":"listening_session","place":null,"chips":["ONLINE A SESSION","JUN 4, 2026","ONLINE"],"vote":null,"source":"Listening session — Online A","tags":["positive"],"inReport":true},{"id":"q4e90ecc6","kind":"quote","text":"Um, uh, I want to see it supported. I don't want to see it like replacing the coordinated entry system for, for homeless people, you know, since homeless, since homelessness is a, is a topic this group has, has touched on before. Um, I think that that's such an important thing that like people who, uh, are going to accept any need that is going to be met for them because they have that need, um, they have no choice to opt out on how AI is used, uh, to determine whether they deserve housing or not.","theme":1,"origin":"listening_session","place":null,"chips":["ONLINE B SESSION","JUN 9, 2026","ONLINE"],"vote":null,"source":"Listening session — Online B","tags":["public service"],"inReport":true},{"id":"qcd83b285","kind":"quote","text":"And then just the whole, when you talk about like overconsumption, I, you know, at a time, there was all this talk about like being carbon neutral, and I read an article maybe a year ago and it's like there's absolutely positively no way in this world that anyone can be carbon neutral. You can reduce your carbon footprint, but you can't be carbon neutral. So it made me think a lot about like the data centers that","theme":2,"origin":"listening_session","place":"Sisters","chips":["SISTERS SESSION","MAY 30, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Sisters","tags":["environment","consumption"],"inReport":false},{"id":"q6ef129b1","kind":"quote","text":"Um, emissions and CO2 from the power generated, and yes, data centers can be powered by renewable energy, if we had that excess of renewable energy, but right now we don't. It's like we went to all this trouble of like replacing our incandescent light bulbs with LEDs, and that doesn't even touch near the order of magnitude of power that AI uses. So, I think the, is it worth it, and what that balance is, is something.","theme":2,"origin":"listening_session","place":null,"chips":["ONLINE A SESSION","JUN 4, 2026","ONLINE"],"vote":null,"source":"Listening session — Online A","tags":["environment"],"inReport":true},{"id":"q8e7ccb1b","kind":"quote","text":"Girls, they just assumed that like they were the same as boys but like maybe a little different, we don't know, um, but it like literally it wasn't until Carol Gilligan started to study that, um, so we have reams of data that are going into these like large language models that are based on a certain, a certain group of people who were studied, right, and not necessarily inclusive of like all lived experience and.","theme":7,"origin":"listening_session","place":"Bend","chips":["BEND SESSION","JUN 6, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Bend","tags":["inequality"],"inReport":true},{"id":"q5d77033d","kind":"quote","text":"Inaccessibility or you know, the difference between the haves and have-nots is going to get even bigger because people who don't have access because maybe they don't have broadband, which often you need for this. Although we're starting to see local AI solutions. But if you don't have access to this and you don't learn about it, you could be at a very big disadvantage, even more so than just regular digital skills. So that's, that's one of my big worries.","theme":7,"origin":"listening_session","place":null,"chips":["ONLINE A SESSION","JUN 4, 2026","ONLINE"],"vote":null,"source":"Listening session — Online A","tags":["inequality","access"],"inReport":true},{"id":"q9eb4f840","kind":"quote","text":"Well, I completely agree with Mattie on the access, especially with marginalized communities. Uh, I, I work with some of the tribes around broadband in Oregon also. Actually, we'll be talking to Confederate Tribes of Sle's broadband coordinator tomorrow, um, because they did get some funding, and that is helpful. You can't do, well, mostly you can't do AI without, um, connectivity. Uh, we are starting to see some.","theme":7,"origin":"listening_session","place":null,"chips":["ONLINE B SESSION","JUN 9, 2026","ONLINE"],"vote":null,"source":"Listening session — Online B","tags":["inequality","indigenous","access"],"inReport":true},{"id":"q7d2bccae","kind":"quote","text":"So I, yeah, I think on Jonathan's points of like using it for permitting, say that's an example of where it can be super useful, if it's used correctly, but if a municipality were to just say, OK, the AI is deciding whether or not to approve permits, AI is not good enough, not accurate enough, doesn't have the judgment to be able to do that accurately, so it's gonna end up like approving things that aren't up to code.","theme":7,"origin":"listening_session","place":null,"chips":["ONLINE A SESSION","JUN 4, 2026","ONLINE"],"vote":null,"source":"Listening session — Online A","tags":["information","accuracy"],"inReport":true},{"id":"q120e6145","kind":"quote","text":"To working everyday folks and kind of democratize the access to information that otherwise the local community might not have the time and access to. Um, so I think that's one area in which there's only a finite amount of hours in the day and the workweek, but it could also help sometimes make that information much more accessible and easily digestible for folks that don't have that on top of their current day job to access and read.","theme":7,"origin":"listening_session","place":null,"chips":["ONLINE B SESSION","JUN 9, 2026","ONLINE"],"vote":null,"source":"Listening session — Online B","tags":["information","positive"],"inReport":true},{"id":"qfd95ad77","kind":"quote","text":"And, and that's something that I don't ever want to change. We have to have humans still being in control of the technology and making the decisions whether to be used or not. I don't want AI systems to make just across the board, oh, we're just going to decide to do this, especially when it comes to weaponization. Uh, but we've seen the federal government didn't want to work with anthropic because anthropic did not want to.","theme":1,"origin":"listening_session","place":null,"chips":["ONLINE A SESSION","JUN 4, 2026","ONLINE"],"vote":null,"source":"Listening session — Online A","tags":["decisionmaking","agency"],"inReport":true},{"id":"q4cec744e","kind":"quote","text":"At least according to another David Shapiro, is that they're competitive because they're looking for faster, better, cheaper, safer, and the safer is always at the end, which I think is a mistake. It ought to, somewhere it should be safe all the way through, but it, you know, you were saying that, uh, you know, the big frontier labs, you know, they're, they gotta come out with a new model every week or 2 weeks or a month.","theme":6,"origin":"listening_session","place":"Bend","chips":["BEND SESSION","JUN 6, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Bend","tags":["moving fast"],"inReport":true},{"id":"q7871e861","kind":"quote","text":"I would actually counter argue that and say you're actually more important than you think. You're a wisdom keeper. Oh,","theme":4,"origin":"listening_session","place":"Madras","chips":["MADRAS SESSION","JUN 6, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Madras","tags":["humanity"],"inReport":false},{"id":"qe407185b","kind":"quote","text":"It doesn't read tone and it doesn't read emotion, but the more that you use it, it's literally meant to predict you, and you can find it if you pay attention to it, but it does require a level of awareness, which has me worried about mental health. I just came from a graduation, you know, and the biggest thing that, that has me concerned about Generation Z and now Generation A is you hear these terms of like this is.","theme":4,"origin":"listening_session","place":"Madras","chips":["MADRAS SESSION","JUN 6, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Madras","tags":["mental health"],"inReport":true},{"id":"q119adac9","kind":"quote","text":"For no, that's for me is the big question in my own little world, and I don't want to get it because I know we have a bigger, but where's the organic human spirit component in this, especially if it's retrieving a bunch of information and then thinking for itself based on just all this statistical information. Where does the organic come into?","theme":4,"origin":"listening_session","place":"Prineville","chips":["PRINEVILLE SESSION","MAY 30, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Prineville","tags":["humanity"],"inReport":false},{"id":"q305166fe","kind":"quote","text":"As a quick aside, I also sit on the homeless shelter board of directors, and I know that is a very politically divisive, but I had a conversation not long ago with somebody who has a different view, but we had a conversation in person and recognized, you know, our goals are the same. It's just how do you get there? We have some different thoughts about it, but you lose that, I think, if you don't have that empathy, that compassion, if it's just all information retrieval.","theme":4,"origin":"listening_session","place":"Prineville","chips":["PRINEVILLE SESSION","MAY 30, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Prineville","tags":[],"inReport":false},{"id":"q9bfe54b9","kind":"quote","text":"How in the world would artificial intelligence analyze that? It seems to me there's a human element that someone who is trained and educated and experienced can talk to an individual maybe over a period of weeks or months and say, OK, you've got this issue or that issue, and everybody's a little different and they can fashion a way forward.","theme":4,"origin":"listening_session","place":"Prineville","chips":["PRINEVILLE SESSION","MAY 30, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Prineville","tags":["humanity","mental health"],"inReport":true},{"id":"qe5e60a7b","kind":"quote","text":"And that for me was the question, where's that spiritual component? Where's that organic component, um, but it got me thinking about the algorithms that what if the algorithms become so overbearing, and maybe that's not the right word, but with all, they all put you in one little pigeon hole.","theme":4,"origin":"listening_session","place":"Prineville","chips":["PRINEVILLE SESSION","MAY 30, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Prineville","tags":["humanity"],"inReport":false},{"id":"q7625ed6b","kind":"quote","text":"Could have saved my, possibly could have saved my wife's life. Um-hum. Um-hum. And I mean, she died of cancer and we didn't catch it. It wasn't caught until too late to do anything. Yeah. I mean, I don't, you know, I don't, I'm not looking for sympathy or anything. I'm just pointing out that. Yeah. That, that's one thing I definitely would have wished that they had had more, you know. Um-hum. I think they were using some of it, you know, but it was not, you know.","theme":7,"origin":"listening_session","place":"Prineville","chips":["PRINEVILLE SESSION","MAY 30, 2026","IN_PERSON"],"vote":null,"source":"Listening session — Prineville","tags":["positive","medicine"],"inReport":true}],"groups":{"A":"Group A · skeptic-leaning","B":"Group B · optimist-leaning"}}</script>
+
+<script>
+(() => {
+'use strict';
+
+const J = id => JSON.parse(document.getElementById(id).textContent);
+const DATA = J('bloom-data');
+let DESC = J('theme-descriptions');
+
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = s => document.querySelector(s);
+const el = (t, c, x) => { const n = document.createElement(t); if (c) n.className = c; if (x != null) n.textContent = x; return n; };
+const esc = s => s.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+
+const byKey = {};
+DATA.themes.forEach(t => byKey[t.key] = t);
+const recsOf = t => DATA.records.filter(r => r.theme === t.n);
+
+// Three axes over the same set of records. Session quotes carry no vote,
+// so they are sprinkled through the lane in every mode rather than plotted.
+const MODES = {
+  consensus:     { score: r => r.vote.minAgree, max: () => 100, tick: v => v + '% AGREE' },
+  controversial: { score: r => r.vote.gap,      max: () => 100, tick: v => v + ' PT GAP' },
+  all:           { score: r => r.vote.total,
+                   max: ps => Math.max(1, ...ps.map(p => p.vote.total)),
+                   tick: v => v + ' VOTES' }
+};
+
+const state = { theme: null, mode: 'consensus', sel: -1, layout: [] };
+let bubbleTimer = null, scrollRaf = null, whoTimer = null, l1Scroll = 0, kivTimer = null;
+
+/* ─── LEVEL 1 ─────────────────────────────────────────── */
+function buildL1() {
+  const wrap = $('#blocks');
+  DATA.themes.forEach((t, ti) => {
+    const b = el('button', 'theme-block');
+    b.style.setProperty('--c', t.color);
+    b.setAttribute('aria-label', `${t.short}: ${t.poll + t.quotes} perspectives`);
+    b.append(el('span', 'arrow', '→'));
+    b.append(el('h2', null, t.short));
+    const n = t.poll + t.quotes;
+    b.append(el('div', 'count label',
+      `${t.poll} statement${t.poll === 1 ? '' : 's'} · ${t.quotes} quote${t.quotes === 1 ? '' : 's'}`));
+    const tal = el('div', 'tally');
+    tal.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < n; i++) {
+      const c = el('i', i >= t.poll ? 'q' : null);
+      c.style.animationDelay = (ti * 70 + i * 16) + 'ms';
+      tal.append(c);
+    }
+    b.append(tal);
+    b.onclick = () => { l1Scroll = scrollY; location.hash = '#/' + t.key; };
+    wrap.append(b);
+  });
+}
+
+/* ─── LAYOUT ──────────────────────────────────────────── */
+function computeLayout(theme, mode) {
+  const all = recsOf(theme);
+  const M = MODES[mode];
+  const polls = all.filter(r => r.vote).sort((a, b) => M.score(b) - M.score(a) || b.vote.total - a.vote.total);
+  // session quotes carry no vote, so they are sprinkled through the lane
+  // rather than plotted — present in every mode, never on the axis
+  const quotes = all.filter(r => !r.vote);
+
+  const smax = M.max(polls);
+  const W = $('#lane').clientWidth || 360;
+  const TOP = 40, BOT = 54;
+  const axisH = Math.max(300, (polls.length + quotes.length * .7) * 62);
+  const height = TOP + axisH + BOT;
+
+  const MAXSQ = Math.max(46, Math.min(68, innerHeight * 0.09));
+  const placed = [];
+
+  const put = (r, y, size) => {
+    let x = 0, ok = false;
+    for (let k = 0; k < 18 && !ok; k++) {
+      x = 6 + Math.random() * Math.max(1, W - size - 12);
+      ok = !placed.some(p =>
+        Math.abs(p.y + p.size / 2 - (y + size / 2)) < (p.size + size) / 2 + 7 &&
+        Math.abs(p.x + p.size / 2 - (x + size / 2)) < (p.size + size) / 2 + 7);
+    }
+    const item = { rec: r, x, y, size };
+    placed.push(item);
+    return item;
+  };
+
+  polls.forEach(r => {
+    const sc = Math.max(0, Math.min(100, M.score(r) / smax * 100));
+    const size = Math.round(32 + (MAXSQ - 32) * Math.sqrt(Math.min(r.vote.total, 250) / 250));
+    put(r, TOP + (1 - sc / 100) * axisH - size / 2, size);
+  });
+  quotes.forEach((r, i) => {
+    // evenly spread bands, jittered, so they scatter instead of stacking
+    const band = (i + .5) / quotes.length;
+    const jit = (Math.random() - .5) * (0.8 / quotes.length);
+    const qs = Math.round(MAXSQ * .74);
+    put(r, TOP + Math.min(.98, Math.max(.02, band + jit)) * axisH - qs / 2, qs);
+  });
+
+  placed.sort((a, b) => a.y - b.y);   // paging follows the lane, top to bottom
+  return { items: placed, height, TOP, axisH, W, smax };
+}
+
+/* ─── LEVEL 2 ─────────────────────────────────────────── */
+function renderL2() {
+  const t = state.theme;
+  document.documentElement.style.setProperty('--c', t.color);
+  $('#l2').style.setProperty('--c', t.color);
+  $('#l3').style.setProperty('--c', t.color);
+  document.querySelector('meta[name="theme-color"]')?.remove();
+  const mc = el('meta'); mc.name = 'theme-color'; mc.content = t.color; document.head.append(mc);
+
+  $('#t-title').textContent = t.short;
+  $('#t-count').textContent =
+    `${t.poll} statement${t.poll === 1 ? '' : 's'} · ${t.quotes} quote${t.quotes === 1 ? '' : 's'}`;
+  const d = (DESC.themes && DESC.themes[t.key]) || {};
+  $('#t-desc').textContent = d.description || '';
+
+  const i = DATA.themes.indexOf(t);
+  const nx = DATA.themes[(i + 1) % DATA.themes.length];
+  $('#nextT').innerHTML = 'Go to <b>' + esc(nx.short) + '</b> →';
+  $('#nextT').onclick = () => { location.hash = '#/' + nx.key; };
+
+  document.querySelectorAll('.pills button').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
+
+  drawLane();
+}
+
+function drawLane() {
+  const lane = $('#lane');
+  lane.innerHTML = '';
+  const L = computeLayout(state.theme, state.mode);
+  state.layout = L;
+  lane.style.height = L.height + 'px';
+
+  // axis
+  const tick = MODES[state.mode].tick;
+  [100, 75, 50, 25, 0].forEach(v => {
+    const row = el('div', 'axisrow');
+    row.style.top = (L.TOP + (1 - v / 100) * L.axisH) + 'px';
+    row.append(el('span', null, tick(Math.round(L.smax * v / 100))));
+    lane.append(row);
+  });
+  // squares
+  L.items.forEach((it, idx) => {
+    const b = el('button', 'sq' + (it.rec.vote ? '' : ' quote'));
+    b.style.cssText = `left:${it.x}px;top:${it.y}px;width:${it.size}px;height:${it.size}px`;
+    b.dataset.i = idx;
+    b.setAttribute('aria-label',
+      (it.rec.vote ? 'Poll statement' : 'Session quote') + ': ' + it.rec.text.slice(0, 70) + '…');
+    const f = el('span', 'face');
+    if (!REDUCED) {
+      f.style.setProperty('--dur', (2.2 + Math.random() * 1.7).toFixed(2) + 's');
+      f.style.setProperty('--del', (-Math.random() * 5).toFixed(2) + 's');
+    } else { f.style.animation = 'none'; }
+    b.append(f);
+    b.onclick = () => open(idx);
+    lane.append(b);
+  });
+
+  $('#laneEnd').textContent = L.items.length + ' perspectives in this theme';
+
+  startBubbles();
+}
+
+/* ─── AMBIENT PREVIEW BUBBLES ─────────────────────────── */
+const bubbles = [];
+function startBubbles() {
+  clearInterval(bubbleTimer);
+  bubbles.splice(0).forEach(b => b.remove());
+  if (REDUCED) return;
+  bubbleTimer = setInterval(tick, 5000);
+  setTimeout(tick, 1400);
+
+  function tick() {
+    if (!$('#l2').classList.contains('on') || $('#l3').classList.contains('on')) return;
+    const nodes = [...document.querySelectorAll('.sq')].filter(n => {
+      const r = n.getBoundingClientRect();
+      return r.top > 40 && r.bottom < innerHeight - 20;
+    });
+    if (!nodes.length) return;
+
+    // two or three at once, in and out together
+    const pool = nodes.slice().sort(() => Math.random() - .5);
+    const count = Math.min(pool.length, 2 + (Math.random() < .5 ? 1 : 0));
+    const made = [];
+    for (const n of pool) {
+      if (made.length >= count) break;
+      const it = state.layout.items[+n.dataset.i];
+      if (made.some(m => Math.abs(m.y - it.y) < 46)) continue;   // no crowding
+      const words = it.rec.text.split(/\s+/);
+      let s = '', i = 0;
+      while (i < words.length && (s + words[i]).length < 40) s += (s ? ' ' : '') + words[i++];
+      const bub = el('div', 'bubble', '“' + s + (i < words.length ? '…' : '') + '”');
+      bub.style.top = (it.y + it.size * .34) + 'px';           // sits over the square
+      if (it.x + it.size * .3 + 180 > state.layout.W)
+        bub.style.right = Math.max(4, state.layout.W - (it.x + it.size * .7)) + 'px';
+      else
+        bub.style.left = (it.x + it.size * .3) + 'px';
+      $('#lane').append(bub);
+      made.push(it);
+      bubbles.push(bub);
+    }
+    if (!made.length) return;
+    requestAnimationFrame(() => bubbles.forEach(b => b.classList.add('in')));
+    setTimeout(() => {
+      const batch = bubbles.splice(0);
+      batch.forEach(b => b.classList.remove('in'));
+      setTimeout(() => batch.forEach(b => b.remove()), 340);
+    }, 3200);
+  }
+}
+
+/* ─── LEVEL 3 ─────────────────────────────────────────── */
+function open(idx) {
+  state.sel = idx;
+  const it = state.layout.items[idx];
+  const r = it.rec;
+  const t = state.theme;
+
+  document.querySelectorAll('.sq.sel').forEach(n => n.classList.remove('sel'));
+  document.querySelector(`.sq[data-i="${idx}"]`)?.classList.add('sel');
+
+  // participant chips, rotating
+  clearInterval(whoTimer);
+  const chips = r.chips.length ? r.chips : ['Anonymous'];
+  const tx = $('#whoTxt');
+  let ci = 0;
+  tx.textContent = chips[0];
+  if (chips.length > 1 && !REDUCED) {
+    whoTimer = setInterval(() => {
+      tx.classList.add('out');
+      setTimeout(() => {
+        ci = (ci + 1) % chips.length;
+        tx.textContent = chips[ci];
+        tx.classList.remove('out');
+      }, 450);
+    }, 3000);
+  }
+
+  const q = $('#s-text');
+  q.textContent = '“' + r.text + '”';
+  const L = r.text.length;
+  const qs = L < 80 ? 30 : L < 150 ? 26 : L < 250 ? 22 : L < 400 ? 19 : L < 600 ? 17 : 15.5;
+  q.style.setProperty('--qs', qs + 'px');
+
+  // meta panel
+  const m = $('#s-meta');
+  m.innerHTML = '';
+  const src = el('section');
+  src.append(el('h4', null, 'Source'));
+  const sv = el('p', 'src', r.source);
+  const bits = [];
+  if (r.place) bits.push(r.place + ', Oregon');
+  if (r.origin === 'cocap_seed') bits.push('Seeded by COCAP, not a participant');
+  if (r.origin === 'participant') bits.push('Written by a participant');
+  if (r.inReport) bits.push('Published in the report');
+  if (bits.length) sv.append(el('small', null, bits.join(' · ')));
+  src.append(sv);
+  m.append(src);
+
+  if (r.vote) {
+    const p = el('section');
+    p.append(el('h4', null, 'Open poll responses · ' + r.vote.total + ' votes'));
+    [['A', 'Group A (skeptic-leaning)'], ['B', 'Group B (optimist-leaning)']].forEach(([k, lab]) => {
+      const g = r.vote[k], row = el('div', 'grow');
+      const top = el('div', 'top');
+      top.append(el('span', null, lab));
+      const bb = el('b', null, g.pct + '% agree'); top.append(bb);
+      row.append(top);
+      const bar = el('div', 'bar');
+      const tot = Math.max(1, g.n);
+      [['d', g.d], ['p', g.p], ['a', g.a]].forEach(([cls, v]) => {
+        const i2 = el('i', cls);
+        i2.style.flex = (v / tot) + ' 0 0';
+        if (!v) i2.style.display = 'none';
+        bar.append(i2);
+      });
+      row.append(bar);
+      p.append(row);
+    });
+    const key = el('div', 'barkey');
+    [['d', 'Disagree'], ['p', 'Pass'], ['a', 'Agree']].forEach(([c, l]) => {
+      const s = el('span'); s.append(el('i', c)); s.append(document.createTextNode(l)); key.append(s);
+    });
+    p.append(key);
+    m.append(p);
+  }
+
+  if (r.tags.length) {
+    const s = el('section');
+    s.append(el('h4', null, 'Tags'));
+    const w = el('div', 'tags');
+    r.tags.forEach(tg => w.append(el('i', null, tg)));
+    s.append(w);
+    m.append(s);
+  }
+
+  const n = state.layout.items.length;
+  $('#pos').innerHTML = (idx + 1) + ' <em>|</em> ' + n;
+  $('#prev').disabled = idx === 0;
+  $('#next').disabled = idx === n - 1;
+
+  document.body.classList.add('reading');
+  $('#l3').classList.add('on');
+  $('#l3').setAttribute('aria-hidden', 'false');
+  $('#cardbody').scrollTop = 0;
+  autoScroll();
+  keepInView(it);
+  $('#closeb').focus({ preventScroll: true });
+}
+
+// Slide the lane so the chosen square sits in the strip of colour left
+// visible above the centred card.
+function keepInView(it) {
+  const laneTop = $('#lane').offsetTop;
+  const strip = Math.max(40, document.querySelector('.card').getBoundingClientRect().top);
+  const want = Math.max(9, (strip - it.size) / 2);
+  const top = Math.max(0, laneTop + it.y - want);
+  scrollTo({ top, behavior: REDUCED ? 'auto' : 'smooth' });
+  // smooth scrolling doesn't always land exactly — nudge once it settles
+  const settle = () => {
+    const n = document.querySelector('.sq.sel');
+    if (n && Math.abs(n.getBoundingClientRect().top - want) > 3)
+      scrollTo({ top, behavior: 'auto' });
+  };
+  clearTimeout(kivTimer);
+  if ('onscrollend' in window) addEventListener('scrollend', settle, { once: true });
+  else kivTimer = setTimeout(settle, 620);
+}
+
+function autoScroll() {
+  cancelAnimationFrame(scrollRaf);
+  const w = $('#cardbody');
+  if (REDUCED) return;
+  // only creep through a long statement — never scroll on into the metadata
+  const limit = () => Math.max(0, Math.min(
+    w.scrollHeight - w.clientHeight,
+    $('.quotewrap').offsetHeight - w.clientHeight + 20));
+  let stopped = false;
+  const stop = () => { stopped = true; cancelAnimationFrame(scrollRaf); off(); };
+  const off = () => ['wheel', 'touchstart', 'pointerdown', 'keydown'].forEach(e => w.removeEventListener(e, stop));
+  ['wheel', 'touchstart', 'pointerdown', 'keydown'].forEach(e => w.addEventListener(e, stop, { passive: true }));
+
+  const t0 = performance.now();
+  const step = now => {
+    if (stopped || !$('#l3').classList.contains('on')) return off();
+    const over = limit();
+    if (over < 6) return off();
+    if (now - t0 > 1800) w.scrollTop = Math.min(over, (now - t0 - 1800) * 0.016);
+    if (w.scrollTop >= over - 1) return off();
+    scrollRaf = requestAnimationFrame(step);
+  };
+  scrollRaf = requestAnimationFrame(step);
+}
+
+function close() {
+  clearInterval(whoTimer);
+  clearTimeout(kivTimer);
+  cancelAnimationFrame(scrollRaf);
+  document.body.classList.remove('reading');
+  $('#l3').classList.remove('on');
+  $('#l3').setAttribute('aria-hidden', 'true');
+  const s = document.querySelector('.sq.sel');
+  s?.classList.remove('sel');
+  s?.focus({ preventScroll: true });
+  state.sel = -1;
+}
+const page = d => {
+  const i = state.sel + d;
+  if (i >= 0 && i < state.layout.items.length) open(i);
+};
+
+/* ─── ROUTING ─────────────────────────────────────────── */
+function route() {
+  const parts = location.hash.replace(/^#\/?/, '').split('/');
+  const key = parts[0], mode = parts[1];
+  const t = byKey[key];
+  if (!t) {
+    clearInterval(bubbleTimer); close();
+    const back = state.theme !== null;
+    $('#l2').classList.remove('on');
+    $('#l2').setAttribute('aria-hidden', 'true');
+    $('#l1').style.display = '';
+    document.title = 'Bloom — A Conversation on AI in Central Oregon';
+    state.theme = null;
+    if (back) scrollTo({ top: l1Scroll, behavior: 'auto' });
+    return;
+  }
+  const changed = state.theme !== t || (mode && mode !== state.mode);
+  state.theme = t;
+  if (mode && MODES[mode]) state.mode = mode;
+  $('#l1').style.display = 'none';
+  $('#l2').classList.add('on');
+  $('#l2').setAttribute('aria-hidden', 'false');
+  document.title = t.short + ' — Bloom';
+  if (state.sel > -1) close();
+  renderL2();
+  if (changed) scrollTo({ top: 0, behavior: 'auto' });
+}
+
+/* ─── WIRE UP ─────────────────────────────────────────── */
+buildL1();
+$('#back').onclick = () => { location.hash = '#/'; };
+$('#closeb').onclick = close;
+$('#scrim').onclick = close;
+$('#prev').onclick = () => page(-1);
+$('#next').onclick = () => page(1);
+document.querySelectorAll('.pills button').forEach(b => b.onclick = () => {
+  state.mode = b.dataset.mode;
+  location.hash = '#/' + state.theme.key + '/' + state.mode;
+  renderL2();
+});
+addEventListener('keydown', e => {
+  if (!$('#l3').classList.contains('on')) return;
+  if (e.key === 'Escape') { close(); e.preventDefault(); }
+  if (e.key === 'ArrowRight') { page(1); e.preventDefault(); }
+  if (e.key === 'ArrowLeft') { page(-1); e.preventDefault(); }
+});
+addEventListener('hashchange', route);
+
+let rw;
+addEventListener('resize', () => {
+  clearTimeout(rw);
+  rw = setTimeout(() => { if ($('#l2').classList.contains('on')) { const s = state.sel; drawLane(); if (s > -1) open(s); } }, 220);
+});
+
+// If served over http, a sibling theme-descriptions.json overrides the inlined copy.
+if (location.protocol === 'http:' || location.protocol === 'https:') {
+  fetch('theme-descriptions.json')
+    .then(r => r.ok ? r.json() : null)
+    .then(j => { if (j && j.themes) { DESC = j; if (state.theme) renderL2(); } })
+    .catch(() => {});
+}
+
+route();
+})();
+</script>
+</body>
+</html>

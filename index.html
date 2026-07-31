@@ -584,6 +584,10 @@ const SCRUB_INSET = 70;   // px reserved on the left of the lane so squares clea
 
 const state = { theme: null, mode: 'consensus', sel: -1, layout: [] };
 let bubbleTimer = null, scrollRaf = null, whoTimer = null, l1Scroll = 0, kivTimer = null, scrubRaf = null;
+// square placement is randomized (jittered scatter, collision avoidance), so it's
+// computed once per theme/mode and cached — revisiting, switching modes back and
+// forth, or a resize (e.g. mobile browser chrome collapsing) must not reshuffle it
+const layoutCache = {};
 
 /* ─── LEVEL 1 ─────────────────────────────────────────── */
 function buildL1() {
@@ -687,7 +691,8 @@ function renderL2() {
 function drawLane() {
   const lane = $('#lane');
   lane.innerHTML = '';
-  const L = computeLayout(state.theme, state.mode);
+  const key = state.theme.key + '/' + state.mode;
+  const L = layoutCache[key] || (layoutCache[key] = computeLayout(state.theme, state.mode));
   state.layout = L;
   lane.style.height = L.height + 'px';
 

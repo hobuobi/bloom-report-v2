@@ -218,7 +218,11 @@ body.reading #l2{padding-bottom:82vh}
   position:absolute;padding:0;
   background:none;border:0;
   -webkit-tap-highlight-color:transparent;
+  transition:opacity .35s ease;
 }
+/* while a bubble is surfacing a couple of statements, dim the rest so
+   the callouts read clearly — everything stays clickable underneath */
+.lane.bubbling .sq:not(.hl){opacity:.3}
 .sq .face{
   display:block;width:100%;height:100%;
   background:#fff;border-radius:9px;
@@ -764,6 +768,7 @@ const bubbles = [];
 function startBubbles() {
   clearInterval(bubbleTimer);
   bubbles.splice(0).forEach(b => b.remove());
+  $('#lane').classList.remove('bubbling');
   if (REDUCED) return;
   bubbleTimer = setInterval(tick, 5000);
   setTimeout(tick, 1400);
@@ -783,7 +788,7 @@ function startBubbles() {
     for (const n of pool) {
       if (made.length >= count) break;
       const it = state.layout.items[+n.dataset.i];
-      if (made.some(m => Math.abs(m.y - it.y) < 46)) continue;   // no crowding
+      if (made.some(m => Math.abs(m.it.y - it.y) < 46)) continue;   // no crowding
       const words = it.rec.text.split(/\s+/);
       let s = '', i = 0;
       while (i < words.length && (s + words[i]).length < 40) s += (s ? ' ' : '') + words[i++];
@@ -794,14 +799,19 @@ function startBubbles() {
       else
         bub.style.left = (it.x + it.size * .3) + 'px';
       $('#lane').append(bub);
-      made.push(it);
+      made.push({ it, n });
       bubbles.push(bub);
     }
     if (!made.length) return;
+    const lane = $('#lane');
+    lane.classList.add('bubbling');
+    made.forEach(m => m.n.classList.add('hl'));
     requestAnimationFrame(() => bubbles.forEach(b => b.classList.add('in')));
     setTimeout(() => {
       const batch = bubbles.splice(0);
       batch.forEach(b => b.classList.remove('in'));
+      lane.classList.remove('bubbling');
+      made.forEach(m => m.n.classList.remove('hl'));
       setTimeout(() => batch.forEach(b => b.remove()), 340);
     }, 3200);
   }

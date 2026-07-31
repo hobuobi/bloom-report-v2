@@ -255,11 +255,14 @@ body.reading #l2{padding-bottom:82vh}
   transition:opacity .35s ease;
 }
 /* while a bubble is surfacing a couple of statements, dim the rest so
-   the callouts read clearly — everything stays clickable underneath */
-.lane.bubbling .sq:not(.hl){opacity:.3}
+   the callouts read clearly — everything stays clickable underneath.
+   Whatever the scrub indicator is crossing stays fully visible too. */
+.lane.bubbling .sq:not(.hl):not(.hit){opacity:.3}
 .sq .face{
-  display:block;width:100%;height:100%;
-  background:#fff;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  width:100%;height:100%;
+  background:#fff;border-radius:50%;
+  line-height:1;
   animation:breathe var(--dur,4s) ease-in-out var(--del,0s) infinite;
   transition:box-shadow .25s ease;
   will-change:transform;
@@ -637,6 +640,23 @@ const titleCaseChip = s => s.toLowerCase().replace(/\b\w+/g, (word, offset, str)
   return word.charAt(0).toUpperCase() + word.slice(1);
 });
 
+// experimental: represent each poll statement in the lane as a person
+// matching who submitted it — gender + age bucket picks the base emoji,
+// race picks a Fitzpatrick skin-tone modifier. Non-participant (seeded)
+// statements aren't tied to any one person, so they get a seed emoji.
+const EMOJI_OLD_AGE = new Set(['55-64', '65+']);
+const EMOJI_SKIN_TONE = { 'WHITE OR CAUCASIAN': '🏻', 'NATIVE AMERICAN': '🏽' };
+const emojiFor = r => {
+  if (r.origin !== 'participant') return '🌱';
+  const old = r.chips.some(c => EMOJI_OLD_AGE.has(c));
+  const gender = r.chips.find(c => c === 'FEMALE' || c === 'MALE' || c === 'OTHER');
+  const tone = EMOJI_SKIN_TONE[r.chips.find(c => EMOJI_SKIN_TONE[c])] || '';
+  const base = gender === 'FEMALE' ? (old ? '👵' : '👩')
+    : gender === 'MALE' ? (old ? '👴' : '👨')
+    : (old ? '🧓' : '🧑');
+  return base + tone;
+};
+
 const byKey = {};
 DATA.themes.forEach(t => byKey[t.key] = t);
 const recsOf = t => DATA.records.filter(r => r.theme === t.n);
@@ -851,7 +871,8 @@ function drawLane() {
     b.style.cssText = `left:${it.x}px;top:${it.y}px;width:${it.size}px;height:${it.size}px`;
     b.dataset.i = idx;
     b.setAttribute('aria-label', 'Poll statement: ' + it.rec.text.slice(0, 70) + '…');
-    const f = el('span', 'face');
+    const f = el('span', 'face', emojiFor(it.rec));
+    f.style.fontSize = Math.round(it.size * 0.56) + 'px';
     if (!REDUCED) {
       f.style.setProperty('--dur', (2.2 + Math.random() * 1.7).toFixed(2) + 's');
       f.style.setProperty('--del', (-Math.random() * 5).toFixed(2) + 's');

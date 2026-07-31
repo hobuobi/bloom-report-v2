@@ -17,6 +17,7 @@
   --agree:#1F8A3B;
   --disagree:#D8362F;
   --pass:#C4C4C4;
+  --home:#0D1B3E;
 
   --geom:'Geom','Futura',system-ui,sans-serif;
   --body:'Hanken Grotesk',system-ui,-apple-system,sans-serif;
@@ -53,8 +54,10 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   background:var(--ink);
 }
 @media (min-width:660px){
-  body{background:#08080a}
-  .shell{box-shadow:0 0 0 1px rgba(255,255,255,.07)}
+  /* on the roomier desktop layout, the gutter around the column tints to
+     match whatever's active — the open theme's color, or --home on L1 */
+  body{background:var(--c,var(--home))}
+  .shell{max-width:800px}
 }
 
 .label{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase}
@@ -1055,6 +1058,7 @@ function route() {
     $('#l2').setAttribute('aria-hidden', 'true');
     $('#l1').style.display = '';
     document.title = 'Bloom — A Conversation on AI in Central Oregon';
+    document.documentElement.style.setProperty('--c', 'var(--home)');
     state.theme = null;
     if (back) scrollTo({ top: l1Scroll, behavior: 'auto' });
     return;

@@ -846,9 +846,7 @@ function open(idx) {
 
   const q = $('#s-text');
   q.textContent = '“' + r.text + '”';
-  const L = r.text.length;
-  const qs = L < 80 ? 30 : L < 150 ? 26 : L < 250 ? 22 : L < 400 ? 19 : L < 600 ? 17 : 15.5;
-  q.style.setProperty('--qs', qs + 'px');
+  q.style.setProperty('--qs', '30px');
 
   // meta panel
   const m = $('#s-meta');

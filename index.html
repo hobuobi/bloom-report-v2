@@ -28,13 +28,15 @@
 
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-html{-webkit-text-size-adjust:100%}
+/* overflow-x here (not on body) — putting it on body makes browsers treat
+   body as the sticky/scroll containing block instead of the viewport,
+   which silently breaks every position:sticky element on the page */
+html{-webkit-text-size-adjust:100%;overflow-x:hidden}
 body{
   background:var(--ink);
   color:#fff;
   font-family:var(--body);
   -webkit-font-smoothing:antialiased;
-  overflow-x:hidden;
 }
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 :focus-visible{outline:2.5px solid currentColor;outline-offset:3px;border-radius:3px}
@@ -165,15 +167,19 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   font-size:16.5px;line-height:1.5;margin:0 0 26px;
   color:#fff;letter-spacing:-.003em;
 }
-.hero .cta{font-size:15px;font-weight:600;margin-bottom:16px}
+.hero .cta{font-size:15px;font-weight:600;margin-bottom:28px}
 
-/* mode pills — stay reachable while you scroll the lane */
+/* mode pills — stay reachable while you scroll the lane. A sibling of
+   .hero and .lane (not nested in .hero) so its sticky containing block
+   is the whole scrollable section, not just the short intro block —
+   otherwise it un-sticks the moment .hero itself scrolls out of view. */
 .pills{
   position:sticky;top:var(--nav-h);z-index:25;
-  display:flex;gap:8px;
-  padding:0 22px 18px;
-  margin:0 -22px;
+  display:flex;justify-content:center;gap:8px;
+  padding:18px 22px;
   background:var(--c);
+  border-top:1px solid rgba(255,255,255,.17);
+  border-bottom:1px solid rgba(255,255,255,.17);
 }
 .pills::before{
   content:'';position:absolute;left:0;right:0;top:-14px;height:14px;
@@ -199,8 +205,6 @@ body.reading #l2{padding-bottom:82vh}
 /* the lane */
 .lane{
   position:relative;
-  margin-top:2px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.18);
   overflow:visible;
 }
 .axisrow{
@@ -213,6 +217,31 @@ body.reading #l2{padding-bottom:82vh}
   font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
   color:rgba(255,255,255,.78);
 }
+
+/* QUOTES mode — a plain stack of cards instead of the scattered lane */
+.lane.quotesList{
+  display:flex;flex-direction:column;gap:12px;
+  padding:6px 22px 46px;
+}
+.qcard{
+  display:block;width:100%;text-align:left;
+  background:#fff;border-radius:20px;
+  padding:18px 20px 20px;
+  -webkit-tap-highlight-color:transparent;
+  transition:transform .2s ease,box-shadow .2s ease;
+  box-shadow:0 1px 3px rgba(0,0,0,.12);
+}
+.qeyebrow{color:var(--c);margin-bottom:9px}
+.qtext{
+  margin:0;color:var(--ink);
+  font-family:var(--geom);font-weight:600;
+  font-size:16.5px;line-height:1.4;letter-spacing:-.006em;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+}
+@media (hover:hover){
+  .qcard:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.22)}
+}
+.qcard.sel{box-shadow:0 0 0 3px var(--c),0 10px 30px rgba(0,0,0,.28)}
 
 .sq{
   position:absolute;padding:0;
@@ -230,11 +259,6 @@ body.reading #l2{padding-bottom:82vh}
   transition:box-shadow .25s ease;
   will-change:transform;
 }
-.sq.quote .face{
-  background:rgba(255,255,255,.3);
-  box-shadow:inset 0 0 0 2.5px #fff;
-  border-radius:9px;
-}
 @keyframes breathe{
   0%,100%{transform:scale(.955)}
   50%{transform:scale(1.075)}
@@ -246,7 +270,6 @@ body.reading #l2{padding-bottom:82vh}
   animation-play-state:paused;transform:scale(1.06);
   box-shadow:0 0 0 4px rgba(255,255,255,.4),0 8px 26px rgba(0,0,0,.3);
 }
-.sq.quote.sel .face{box-shadow:inset 0 0 0 2.5px #fff,0 0 0 4px rgba(255,255,255,.4)}
 /* the square currently crossed by the scrub line */
 .sq.hit .face{box-shadow:0 0 0 5px #ffd400,0 8px 26px rgba(0,0,0,.3)}
 
@@ -466,11 +489,11 @@ body.reading .scrub{opacity:0;pointer-events:none}
       <div class="count label" id="t-count"></div>
       <p class="desc" id="t-desc"></p>
       <div class="cta">Click on any perspectives below:</div>
-      <div class="pills" role="group" aria-label="Sort perspectives">
-        <button data-mode="consensus" aria-pressed="true">Consensus</button>
-        <button data-mode="controversial" aria-pressed="false">Controversial</button>
-        <button data-mode="all" aria-pressed="false">All</button>
-      </div>
+    </div>
+    <div class="pills" role="group" aria-label="Sort perspectives">
+      <button data-mode="consensus" aria-pressed="true">Consensus</button>
+      <button data-mode="controversial" aria-pressed="false">Controversial</button>
+      <button data-mode="quotes" aria-pressed="false">Quotes</button>
     </div>
     <div class="lane" id="lane"></div>
     <div class="lane-end" id="laneEnd"></div>
@@ -575,16 +598,12 @@ const recsOf = t => DATA.records.filter(r => r.theme === t.n);
 // so they are sprinkled through the lane in every mode rather than plotted.
 const MODES = {
   consensus:     { score: r => r.vote.minAgree, max: () => 100, tick: v => v + '% AGREE' },
-  controversial: { score: r => r.vote.gap,      max: () => 100, tick: v => v + ' PT GAP' },
-  all:           { score: r => r.vote.total,
-                   max: ps => Math.max(1, ...ps.map(p => p.vote.total)),
-                   tick: v => v + ' VOTES' }
+  controversial: { score: r => r.vote.gap,      max: () => 100, tick: v => v + ' PT GAP' }
 };
 // short readout for the scrub pill — the axis rows already spell the unit out in full
 const SCRUB_TICK = {
   consensus: v => v + '%',
-  controversial: v => v + ' pt',
-  all: v => v
+  controversial: v => v + ' pt'
 };
 const SCRUB_INSET = 70;   // px reserved on the left of the lane so squares clear the scrub pill
 
@@ -622,17 +641,15 @@ function buildL1() {
 
 /* ─── LAYOUT ──────────────────────────────────────────── */
 function computeLayout(theme, mode) {
-  const all = recsOf(theme);
+  // session quotes live in their own Quotes tab now — only poll statements
+  // ever get plotted on the lane's axis
   const M = MODES[mode];
-  const polls = all.filter(r => r.vote).sort((a, b) => M.score(b) - M.score(a) || b.vote.total - a.vote.total);
-  // session quotes carry no vote, so they are sprinkled through the lane
-  // rather than plotted — present in every mode, never on the axis
-  const quotes = all.filter(r => !r.vote);
+  const polls = recsOf(theme).filter(r => r.vote).sort((a, b) => M.score(b) - M.score(a) || b.vote.total - a.vote.total);
 
   const smax = M.max(polls);
   const W = $('#lane').clientWidth || 360;
   const TOP = 40, BOT = 54;
-  const axisH = Math.max(300, (polls.length + quotes.length * .7) * 62);
+  const axisH = Math.max(300, polls.length * 62);
   const height = TOP + axisH + BOT;
 
   const MAXSQ = Math.max(46, Math.min(68, innerHeight * 0.09));
@@ -655,13 +672,6 @@ function computeLayout(theme, mode) {
     const sc = Math.max(0, Math.min(100, M.score(r) / smax * 100));
     const size = Math.round(32 + (MAXSQ - 32) * Math.sqrt(Math.min(r.vote.total, 250) / 250));
     put(r, TOP + (1 - sc / 100) * axisH - size / 2, size);
-  });
-  quotes.forEach((r, i) => {
-    // evenly spread bands, jittered, so they scatter instead of stacking
-    const band = (i + .5) / quotes.length;
-    const jit = (Math.random() - .5) * (0.8 / quotes.length);
-    const qs = Math.round(MAXSQ * .74);
-    put(r, TOP + Math.min(.98, Math.max(.02, band + jit)) * axisH - qs / 2, qs);
   });
 
   placed.sort((a, b) => a.y - b.y);   // paging follows the lane, top to bottom
@@ -691,12 +701,46 @@ function renderL2() {
   document.querySelectorAll('.pills button').forEach(b =>
     b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
 
-  drawLane();
+  if (state.mode === 'quotes') drawQuotes(); else drawLane();
+}
+
+// ~3 lines of the card's quote font, word-truncated with our own ellipsis
+// (a line-clamp is also set in CSS as a safety net for narrower screens)
+const QUOTE_CLIP = 185;
+function clip(text, max) {
+  const words = text.split(/\s+/);
+  let s = '', i = 0;
+  while (i < words.length && (s + (s ? ' ' : '') + words[i]).length <= max) s += (s ? ' ' : '') + words[i++];
+  return i < words.length ? s + '…' : s;
+}
+
+function drawQuotes() {
+  clearInterval(bubbleTimer);
+  const lane = $('#lane');
+  lane.innerHTML = '';
+  lane.classList.add('quotesList');
+  lane.style.height = '';
+  const quotes = recsOf(state.theme).filter(r => !r.vote);
+  state.layout = { items: quotes.map(r => ({ rec: r })) };
+
+  quotes.forEach((r, idx) => {
+    const card = el('button', 'qcard');
+    card.dataset.i = idx;
+    card.append(el('div', 'qeyebrow label', r.source));
+    card.append(el('p', 'qtext', '“' + clip(r.text, QUOTE_CLIP) + '”'));
+    card.onclick = () => open(idx);
+    lane.append(card);
+  });
+
+  $('#laneEnd').textContent = quotes.length
+    ? quotes.length + ' quote' + (quotes.length === 1 ? '' : 's') + ' in this theme'
+    : 'No session quotes recorded for this theme';
 }
 
 function drawLane() {
   const lane = $('#lane');
   lane.innerHTML = '';
+  lane.classList.remove('quotesList');
   const key = state.theme.key + '/' + state.mode;
   const L = layoutCache[key] || (layoutCache[key] = computeLayout(state.theme, state.mode));
   state.layout = L;
@@ -723,11 +767,10 @@ function drawLane() {
   });
   // squares
   L.items.forEach((it, idx) => {
-    const b = el('button', 'sq' + (it.rec.vote ? '' : ' quote'));
+    const b = el('button', 'sq');
     b.style.cssText = `left:${it.x}px;top:${it.y}px;width:${it.size}px;height:${it.size}px`;
     b.dataset.i = idx;
-    b.setAttribute('aria-label',
-      (it.rec.vote ? 'Poll statement' : 'Session quote') + ': ' + it.rec.text.slice(0, 70) + '…');
+    b.setAttribute('aria-label', 'Poll statement: ' + it.rec.text.slice(0, 70) + '…');
     const f = el('span', 'face');
     if (!REDUCED) {
       f.style.setProperty('--dur', (2.2 + Math.random() * 1.7).toFixed(2) + 's');
@@ -835,8 +878,9 @@ function open(idx) {
   const r = it.rec;
   const t = state.theme;
 
-  document.querySelectorAll('.sq.sel').forEach(n => n.classList.remove('sel'));
-  document.querySelector(`.sq[data-i="${idx}"]`)?.classList.add('sel');
+  const itemSel = state.mode === 'quotes' ? '.qcard' : '.sq';
+  document.querySelectorAll(itemSel + '.sel').forEach(n => n.classList.remove('sel'));
+  document.querySelector(`${itemSel}[data-i="${idx}"]`)?.classList.add('sel');
 
   // participant chips, rotating
   clearInterval(whoTimer);
@@ -921,7 +965,7 @@ function open(idx) {
   $('#l3').setAttribute('aria-hidden', 'false');
   $('#cardbody').scrollTop = 0;
   autoScroll();
-  keepInView(it);
+  if (state.mode !== 'quotes') keepInView(it);
   $('#closeb').focus({ preventScroll: true });
 }
 
@@ -976,7 +1020,7 @@ function close() {
   document.body.classList.remove('reading');
   $('#l3').classList.remove('on');
   $('#l3').setAttribute('aria-hidden', 'true');
-  const s = document.querySelector('.sq.sel');
+  const s = document.querySelector('.sq.sel, .qcard.sel');
   s?.classList.remove('sel');
   s?.focus({ preventScroll: true });
   state.sel = -1;
@@ -1004,7 +1048,7 @@ function route() {
   }
   const changed = state.theme !== t || (mode && mode !== state.mode);
   state.theme = t;
-  if (mode && MODES[mode]) state.mode = mode;
+  if (mode && (MODES[mode] || mode === 'quotes')) state.mode = mode;
   $('#l1').style.display = 'none';
   $('#l2').classList.add('on');
   $('#l2').setAttribute('aria-hidden', 'false');
@@ -1037,7 +1081,12 @@ addEventListener('hashchange', route);
 let rw;
 addEventListener('resize', () => {
   clearTimeout(rw);
-  rw = setTimeout(() => { if ($('#l2').classList.contains('on')) { const s = state.sel; drawLane(); if (s > -1) open(s); } }, 220);
+  rw = setTimeout(() => {
+    if (!$('#l2').classList.contains('on')) return;
+    const s = state.sel;
+    if (state.mode === 'quotes') drawQuotes(); else drawLane();
+    if (s > -1) open(s);
+  }, 220);
 });
 
 // If served over http, a sibling theme-descriptions.json overrides the inlined copy.

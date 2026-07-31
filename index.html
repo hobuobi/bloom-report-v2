@@ -247,6 +247,8 @@ body.reading #l2{padding-bottom:82vh}
   box-shadow:0 0 0 4px rgba(255,255,255,.4),0 8px 26px rgba(0,0,0,.3);
 }
 .sq.quote.sel .face{box-shadow:inset 0 0 0 2.5px #fff,0 0 0 4px rgba(255,255,255,.4)}
+/* the square currently crossed by the scrub line */
+.sq.hit .face{box-shadow:0 0 0 5px #ffd400,0 8px 26px rgba(0,0,0,.3)}
 
 /* the little text bubbles that surface every few seconds */
 .bubble{
@@ -284,8 +286,8 @@ body.reading #l2{padding-bottom:82vh}
   white-space:nowrap;
 }
 .scrub .line{
-  flex:1 1 auto;height:1px;
-  background:rgba(255,255,255,.3);
+  flex:1 1 auto;height:2px;
+  background:#fff;
 }
 body.reading .scrub{opacity:0;pointer-events:none}
 
@@ -751,12 +753,21 @@ function updateScrub() {
   if (!$('#l2').classList.contains('on') || !state.layout) return;
   const L = state.layout;
   const scrub = $('#lane .scrub');
-  if (!scrub) return;
+  const line = $('#lane .scrub .line');
+  if (!scrub || !line) return;
   const laneTop = $('#lane').getBoundingClientRect().top;
   const localY = scrub.getBoundingClientRect().top - laneTop;
   const frac = Math.max(0, Math.min(1, 1 - (localY - L.TOP) / L.axisH));
   const val = Math.round(L.smax * frac);
   $('#scrubVal').textContent = SCRUB_TICK[state.mode](val);
+
+  // highlight whichever square the line is actually crossing
+  const lineRect = line.getBoundingClientRect();
+  const lineY = lineRect.top + lineRect.height / 2 - laneTop;
+  document.querySelectorAll('#lane .sq').forEach(n => {
+    const it = L.items[+n.dataset.i];
+    n.classList.toggle('hit', lineY >= it.y && lineY <= it.y + it.size);
+  });
 }
 addEventListener('scroll', () => {
   if (scrubRaf) return;

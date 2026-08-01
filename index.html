@@ -258,6 +258,9 @@ body.reading #l2{padding-bottom:82vh}
    the callouts read clearly — everything stays clickable underneath.
    Whatever the scrub indicator is crossing stays fully visible too. */
 .lane.bubbling .sq:not(.hl):not(.hit){opacity:.3}
+/* same idea for the scrub indicator itself — dim everything it isn't
+   currently crossing, so the highlighted square(s) read clearly */
+.lane:has(.sq.hit) .sq:not(.hit){opacity:.3}
 .sq .face{
   display:flex;align-items:center;justify-content:center;
   width:100%;height:100%;
@@ -284,7 +287,7 @@ body.reading #l2{padding-bottom:82vh}
 /* the little text bubbles that surface every few seconds */
 .bubble{
   position:absolute;z-index:12;
-  max-width:210px;
+  max-width:min(210px,calc(100vw - 24px));
   font-size:11.5px;line-height:1.35;
   font-weight:500;
   padding:6px 11px;border-radius:999px;
@@ -884,7 +887,7 @@ function drawLane() {
 
   $('#laneEnd').textContent = L.items.length + ' perspectives in this theme';
 
-  startBubbles();
+  // startBubbles();   // ambient preview bubbles — suppressed for now, not removed
   updateScrub();
 }
 
@@ -953,10 +956,11 @@ function startBubbles() {
       while (i < words.length && (s + words[i]).length < 40) s += (s ? ' ' : '') + words[i++];
       const bub = el('div', 'bubble', '“' + s + (i < words.length ? '…' : '') + '”');
       bub.style.top = (it.y + it.size * .34) + 'px';           // sits over the square
-      if (it.x + it.size * .3 + 180 > state.layout.W)
-        bub.style.right = Math.max(4, state.layout.W - (it.x + it.size * .7)) + 'px';
-      else
-        bub.style.left = (it.x + it.size * .3) + 'px';
+      // clamp against the bubble's own CSS max-width (210px) — not a
+      // guess at its rendered width — so it can never push past either
+      // edge of the lane and force mobile browsers to zoom the page out
+      const left = Math.max(4, Math.min(it.x + it.size * .3, state.layout.W - 214));
+      bub.style.left = left + 'px';
       $('#lane').append(bub);
       made.push({ it, n });
       bubbles.push(bub);

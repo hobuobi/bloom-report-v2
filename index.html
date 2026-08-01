@@ -253,14 +253,15 @@ body.reading #l2{padding-bottom:82vh}
   background:none;border:0;
   -webkit-tap-highlight-color:transparent;
   transition:opacity .35s ease;
+  z-index:20;   /* above the scrub line (18) so it never draws over a statement circle */
 }
 /* while a bubble is surfacing a couple of statements, dim the rest so
    the callouts read clearly — everything stays clickable underneath.
    Whatever the scrub indicator is crossing stays fully visible too. */
 .lane.bubbling .sq:not(.hl):not(.hit){opacity:.3}
-/* same idea for the scrub indicator itself — dim everything it isn't
-   currently crossing, so the highlighted square(s) read clearly */
-.lane:has(.sq.hit) .sq:not(.hit){opacity:.3}
+/* same idea for the scrub indicator (and hovering a circle directly) —
+   dim everything but whatever's hit/hovered so it reads clearly */
+.lane:has(.sq.hit, .sq:hover) .sq:not(.hit):not(:hover){opacity:.3}
 .sq .face{
   display:flex;align-items:center;justify-content:center;
   width:100%;height:100%;
@@ -275,7 +276,10 @@ body.reading #l2{padding-bottom:82vh}
   50%{transform:scale(1.075)}
 }
 @media (hover:hover){
-  .sq:hover .face{animation-play-state:paused;transform:scale(1.09)}
+  .sq:hover .face{
+    animation-play-state:paused;transform:scale(1.09);
+    box-shadow:0 0 0 5px #fff,0 8px 26px rgba(0,0,0,.3);
+  }
 }
 .sq.sel .face{
   animation-play-state:paused;transform:scale(1.06);
@@ -306,7 +310,7 @@ body.reading #l2{padding-bottom:82vh}
 .scrub{
   position:sticky;top:50vh;
   height:var(--scrub-h);
-  z-index:27;
+  z-index:18;   /* below .sq (20) so statement circles draw over the line, above .minimap (15) */
   display:flex;align-items:center;
   pointer-events:none;
   transition:opacity .28s ease;
@@ -317,7 +321,6 @@ body.reading #l2{padding-bottom:82vh}
   background:#fff;color:var(--c);
   padding:9px 14px 9px 13px;
   border-radius:0 999px 999px 0;
-  box-shadow:0 4px 14px rgba(0,0,0,.28);
   white-space:nowrap;
 }
 .scrub .line{
@@ -335,7 +338,7 @@ body.reading .scrub{opacity:0;pointer-events:none}
 .minimap{
   position:sticky;left:0;
   width:40px;
-  z-index:20;
+  z-index:15;
   background:rgba(255,255,255,.12);
   border-radius:4px;
   pointer-events:none;
@@ -356,6 +359,53 @@ body.reading .scrub{opacity:0;pointer-events:none}
   transform:translateY(-50%);
 }
 body.reading .minimap{opacity:0;pointer-events:none}
+
+/* statement preview — a bottom sheet previewing whatever the scrub is
+   currently crossing. Slides up once, the first time it has something
+   to show; after that it only ever fades between shown/empty, never
+   slides away again. */
+.statPreview{
+  position:fixed;left:0;right:0;bottom:0;
+  z-index:26;
+  display:flex;justify-content:center;
+  pointer-events:none;
+  transform:translateY(115%);
+  transition:transform .4s cubic-bezier(.2,.85,.3,1),opacity .3s ease;
+}
+.statPreview[hidden]{display:none}
+.statPreview.shown{transform:translateY(0)}
+.statPreview.empty{opacity:0}
+body.reading .statPreview{opacity:0;pointer-events:none}
+
+.spCard{
+  pointer-events:auto;
+  display:flex;align-items:center;gap:12px;
+  width:calc(100% - 28px);max-width:572px;   /* matches .card (the statement modal) */
+  background:#fff;
+  border-radius:24px 24px 0 0;
+  padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px)) 10px;
+  text-align:left;
+  box-shadow:0 10px 30px rgba(0,0,0,.32);
+  transition:transform .15s ease;
+}
+.spCard:active{transform:scale(.97)}
+.spAv{
+  flex:none;width:44px;height:44px;border-radius:50%;
+  background:#fff;
+  display:grid;place-items:center;
+  font-size:23px;
+  box-shadow:0 0 0 3px var(--c);
+}
+.spBody{min-width:0}
+.spEyebrow{
+  display:block;
+  font-family:var(--mono);font-size:0.8rem;letter-spacing:.09em;text-transform:uppercase;font-weight: 500;
+  color:var(--c);margin-bottom:3px;
+}
+.spText{
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  color:#333;font-size:1.1rem;line-height:1.35;font-weight:500;
+}
 
 .lane-end{
   padding:34px 22px 60px;
@@ -530,6 +580,15 @@ body.reading .minimap{opacity:0;pointer-events:none}
       <button id="back">← Back</button>
       <button class="nextT" id="nextT"></button>
     </div>
+    <div class="statPreview" id="statPreview" hidden aria-hidden="true">
+      <button class="spCard" id="spCard" type="button">
+        <span class="spAv" id="spAv"></span>
+        <span class="spBody">
+          <span class="spEyebrow" id="spEyebrow"></span>
+          <span class="spText" id="spText"></span>
+        </span>
+      </button>
+    </div>
     <div class="hero">
       <h1 id="t-title"></h1>
       <div class="count label" id="t-count"></div>
@@ -673,7 +732,7 @@ const MODES = {
 // short readout for the scrub pill — the axis rows already spell the unit out in full
 const SCRUB_TICK = {
   consensus: v => v + '%',
-  controversial: v => v + ' pt'
+  controversial: v => v + ' PT'
 };
 const SCRUB_INSET = 70;   // px reserved on the left of the lane so squares clear the scrub pill
 
@@ -790,6 +849,7 @@ function clip(text, max) {
 
 function drawQuotes() {
   clearInterval(bubbleTimer);
+  updatePreview([]);   // no scrub/axis in quotes mode, so nothing can be "hit"
   const lane = $('#lane');
   lane.innerHTML = '';
   lane.classList.add('quotesList');
@@ -882,6 +942,11 @@ function drawLane() {
     } else { f.style.animation = 'none'; }
     b.append(f);
     b.onclick = () => open(idx);
+    // hovering (mouse/trackpad users) also surfaces the preview, same as
+    // the scrub crossing it — pause the auto-cycle while hovered, then
+    // hand control back to whatever the indicator actually reflects
+    b.addEventListener('mouseenter', () => previewHover(idx));
+    b.addEventListener('mouseleave', previewHoverEnd);
     lane.append(b);
   });
 
@@ -908,13 +973,18 @@ function updateScrub() {
   const val = Math.round(L.smax * frac);
   $('#scrubVal').textContent = SCRUB_TICK[state.mode](val);
 
-  // highlight whichever square the line is actually crossing
+  // highlight whichever square(s) the line is actually crossing
   const lineRect = line.getBoundingClientRect();
   const lineY = lineRect.top + lineRect.height / 2 - laneTop;
+  const hitIdxs = [];
   document.querySelectorAll('#lane .sq').forEach(n => {
-    const it = L.items[+n.dataset.i];
-    n.classList.toggle('hit', lineY >= it.y && lineY <= it.y + it.size);
+    const idx = +n.dataset.i;
+    const it = L.items[idx];
+    const hit = lineY >= it.y && lineY <= it.y + it.size;
+    n.classList.toggle('hit', hit);
+    if (hit) hitIdxs.push(idx);
   });
+  updatePreview(hitIdxs);
 
   // mirror the same position onto the minimap's "you are here" marker
   const marker = $('#miniNow');
@@ -924,6 +994,72 @@ addEventListener('scroll', () => {
   if (scrubRaf) return;
   scrubRaf = requestAnimationFrame(() => { scrubRaf = null; updateScrub(); });
 }, { passive: true });
+
+/* ─── STATEMENT PREVIEW (bottom sheet) ───────────────────
+   Previews whichever statement(s) the scrub line is crossing. Slides
+   up from the bottom the first time it has something to show, then —
+   per design — never slides away again: it just fades to transparent
+   when nothing's currently highlighted, and back in when something is.
+   With more than one hit at once, it cycles between them. */
+let previewShown = false, previewTimer = null, previewCycle = 0, previewHovering = false;
+const PREVIEW_CLIP = 120;   // ~2 lines at the card's text size
+
+function revealPreview() {
+  const wrap = $('#statPreview');
+  wrap.classList.remove('empty');
+  if (!previewShown) {
+    previewShown = true;
+    wrap.hidden = false;
+    requestAnimationFrame(() => wrap.classList.add('shown'));
+  }
+}
+
+function updatePreview(hitIdxs) {
+  if (previewHovering) return;   // hover has taken the wheel — leave it alone
+  const wrap = $('#statPreview');
+  if (!hitIdxs.length) {
+    clearInterval(previewTimer);
+    if (previewShown) wrap.classList.add('empty');
+    return;
+  }
+  revealPreview();
+
+  previewCycle %= hitIdxs.length;
+  renderPreviewItem(hitIdxs[previewCycle]);
+
+  clearInterval(previewTimer);
+  if (hitIdxs.length > 1) {
+    previewTimer = setInterval(() => {
+      previewCycle = (previewCycle + 1) % hitIdxs.length;
+      renderPreviewItem(hitIdxs[previewCycle]);
+    }, 5000);
+  }
+}
+
+function renderPreviewItem(idx) {
+  const r = state.layout.items[idx].rec;
+  const v = r.vote;
+  $('#spAv').textContent = emojiFor(r);
+  $('#spEyebrow').textContent = state.mode === 'controversial'
+    ? v.gap + ' PT DIFFERENCE'
+    : v.minAgree + '% AGREEMENT';
+  $('#spText').textContent = clip(r.text, PREVIEW_CLIP);
+  $('#spCard').onclick = () => open(idx);
+}
+
+// hovering a circle previews it directly, overriding the scrub-driven
+// cycling until the mouse leaves, at which point updateScrub() takes
+// the wheel back and restores whatever the indicator actually reflects
+function previewHover(idx) {
+  previewHovering = true;
+  clearInterval(previewTimer);
+  revealPreview();
+  renderPreviewItem(idx);
+}
+function previewHoverEnd() {
+  previewHovering = false;
+  updateScrub();
+}
 
 /* ─── AMBIENT PREVIEW BUBBLES ─────────────────────────── */
 const bubbles = [];
@@ -1155,9 +1291,11 @@ function route() {
     if (back) scrollTo({ top: l1Scroll, behavior: 'auto' });
     return;
   }
-  const changed = state.theme !== t || (mode && mode !== state.mode);
+  const themeChanged = state.theme !== t;
+  const changed = themeChanged || (mode && mode !== state.mode);
   state.theme = t;
   if (mode && (MODES[mode] || mode === 'quotes')) state.mode = mode;
+  else if (themeChanged) state.mode = 'consensus';   // every theme starts on Consensus unless the link says otherwise
   $('#l1').style.display = 'none';
   $('#l2').classList.add('on');
   $('#l2').setAttribute('aria-hidden', 'false');

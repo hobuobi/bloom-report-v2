@@ -172,6 +172,13 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   color:#fff;letter-spacing:-.003em;
 }
 .hero .cta{font-size:15px;font-weight:600;margin-bottom:28px}
+@media (min-width:660px){
+  /* placed after the base rules above so it actually wins the cascade —
+     an earlier attempt put this override before them and silently lost */
+  .masthead p{font-size:16px}
+  .hero .desc{font-size:18.5px}
+  .hero .cta{font-size:17px}
+}
 
 /* mode pills — stay reachable while you scroll the lane. A sibling of
    .hero and .lane (not nested in .hero) so its sticky containing block
@@ -247,6 +254,56 @@ body.reading #l2{padding-bottom:82vh}
   .qcard:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.22)}
 }
 .qcard.sel{box-shadow:0 0 0 3px var(--c),0 10px 30px rgba(0,0,0,.28)}
+
+/* LIST mode — same records/order as Map, but a plain card stack like
+   Quotes: full statement text, an emoji icon, and a tiered score pill */
+.lane.listView{
+  display:flex;flex-direction:column;gap:12px;
+  padding:6px 22px 46px;
+}
+.orderSwitch{
+  align-self:flex-start;
+  font-family:var(--body);font-size:13px;font-weight:600;
+  color:#fff;
+  background:rgba(255,255,255,.1);
+  padding:9px 16px;border-radius:999px;
+  transition:background .2s ease;
+}
+.orderSwitch:hover{background:rgba(255,255,255,.18)}
+.orderSwitch:active{background:rgba(255,255,255,.08)}
+.lcard{
+  display:block;width:100%;text-align:left;
+  background:#fff;border-radius:20px;
+  padding:16px 18px 18px;
+  -webkit-tap-highlight-color:transparent;
+  transition:transform .2s ease,box-shadow .2s ease;
+  box-shadow:0 1px 3px rgba(0,0,0,.12);
+}
+.lscore{
+  display:inline-block;
+  font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  color:#fff;padding:5px 11px;border-radius:999px;
+  margin-bottom:12px;
+}
+.lscore.tier-green{background:var(--agree)}
+.lscore.tier-gray{background:#484848}
+.lscore.tier-red{background:var(--disagree)}
+.lrow{display:flex;align-items:flex-start;gap:12px}
+.lAv{
+  flex:none;width:38px;height:38px;border-radius:50%;
+  background:color-mix(in srgb,var(--c) 9%,#fff);
+  display:grid;place-items:center;
+  font-size:19px;
+}
+.lText{
+  margin:0;color:var(--ink);
+  font-family:var(--geom);font-weight:600;
+  font-size:16.5px;line-height:1.4;letter-spacing:-.006em;
+}
+@media (hover:hover){
+  .lcard:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.22)}
+}
+.lcard.sel{box-shadow:0 0 0 3px var(--c),0 10px 30px rgba(0,0,0,.28)}
 
 .sq{
   position:absolute;padding:0;
@@ -596,8 +653,8 @@ body.reading .statPreview{opacity:0;pointer-events:none}
       <div class="cta">Click on any perspectives below:</div>
     </div>
     <div class="pills" role="group" aria-label="Sort perspectives">
-      <button data-mode="consensus" aria-pressed="true">Consensus</button>
-      <button data-mode="controversial" aria-pressed="false">Controversial</button>
+      <button data-mode="map" aria-pressed="false">Map</button>
+      <button data-mode="list" aria-pressed="true">List</button>
       <button data-mode="quotes" aria-pressed="false">Quotes</button>
     </div>
     <div class="lane" id="lane"></div>
@@ -723,25 +780,25 @@ const byKey = {};
 DATA.themes.forEach(t => byKey[t.key] = t);
 const recsOf = t => DATA.records.filter(r => r.theme === t.n);
 
-// Three axes over the same set of records. Session quotes carry no vote,
-// so they are sprinkled through the lane in every mode rather than plotted.
+// The Map tab's one axis over the poll statements. List mode reuses this
+// same score to sort its cards, just renders them differently. Session
+// quotes carry no vote, so they only ever appear under the Quotes tab.
 const MODES = {
-  consensus:     { score: r => r.vote.minAgree, max: () => 100, tick: v => v + '% AGREE' },
-  controversial: { score: r => r.vote.gap,      max: () => 100, tick: v => v + ' PT GAP' }
+  map: { score: r => r.vote.minAgree, max: () => 100, tick: v => v + '% AGREE' }
 };
-// short readout for the scrub pill — the axis rows already spell the unit out in full
-const SCRUB_TICK = {
-  consensus: v => v + '%',
-  controversial: v => v + ' PT'
-};
+// short readout for the scrub pill — the axis row already spells the unit out in full
+const SCRUB_TICK = { map: v => v + '%' };
 const SCRUB_INSET = 70;   // px reserved on the left of the lane so squares clear the scrub pill
 
-// thresholds for the statement-card indicator pill (consensus/difference/neutral)
+// thresholds shared by the statement-card indicator pill and the List
+// tab's score pill (consensus/difference/neutral, green/gray/red)
 const DIFFERENCE_MIN_GAP = 35;    // group-to-group gap (points) counted as a real split
 const CONSENSUS_MIN_AGREE = 65;   // minAgree (%) counted as both groups genuinely on board
+const LIST_LOW_AGREE = 35;        // minAgree (%) below which List's pill reads red
 
-const state = { theme: null, mode: 'consensus', sel: -1, layout: [] };
+const state = { theme: null, mode: 'list', sel: -1, layout: [] };
 let bubbleTimer = null, scrollRaf = null, l1Scroll = 0, kivTimer = null, scrubRaf = null;
+let listAsc = false;   // List tab sort direction — toggled by the "Switch order" button
 // square placement is randomized (jittered scatter, collision avoidance), so it's
 // computed once per theme/mode and cached — revisiting, switching modes back and
 // forth, or a resize (e.g. mobile browser chrome collapsing) must not reshuffle it
@@ -834,8 +891,14 @@ function renderL2() {
   document.querySelectorAll('.pills button').forEach(b =>
     b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
 
-  if (state.mode === 'quotes') drawQuotes(); else drawLane();
+  if (state.mode === 'quotes') drawQuotes();
+  else if (state.mode === 'list') drawList();
+  else drawLane();
 }
+
+// how far down the nav + pills bar together push everything below them —
+// shared by anything that sticks just underneath both (minimap, order bar)
+const chromeH = () => $('.l2nav').offsetHeight + $('.pills').offsetHeight;
 
 // ~3 lines of the card's quote font, word-truncated with our own ellipsis
 // (a line-clamp is also set in CSS as a safety net for narrower screens)
@@ -852,6 +915,7 @@ function drawQuotes() {
   updatePreview([]);   // no scrub/axis in quotes mode, so nothing can be "hit"
   const lane = $('#lane');
   lane.innerHTML = '';
+  lane.classList.remove('listView');
   lane.classList.add('quotesList');
   lane.style.height = '';
   const quotes = recsOf(state.theme).filter(r => !r.vote);
@@ -871,10 +935,48 @@ function drawQuotes() {
     : 'No session quotes recorded for this theme';
 }
 
-function drawLane() {
+// LIST mode — same poll statements and ordering as the Map tab, just
+// laid out as a plain card stack (à la Quotes) instead of scattered on
+// an axis: full untruncated text, an emoji icon, and a tiered score pill.
+function drawList() {
+  clearInterval(bubbleTimer);
+  updatePreview([]);   // no scrub/axis in list mode, so nothing can be "hit"
   const lane = $('#lane');
   lane.innerHTML = '';
   lane.classList.remove('quotesList');
+  lane.classList.add('listView');
+  lane.style.height = '';
+  const M = MODES.map;
+  const dir = listAsc ? -1 : 1;
+  const polls = recsOf(state.theme).filter(r => r.vote)
+    .sort((a, b) => dir * (M.score(b) - M.score(a)) || b.vote.total - a.vote.total);
+  state.layout = { items: polls.map(r => ({ rec: r })) };
+
+  const orderBtn = el('button', 'orderSwitch', 'Switch order');
+  orderBtn.onclick = () => { listAsc = !listAsc; drawList(); };
+  lane.append(orderBtn);
+
+  polls.forEach((r, idx) => {
+    const tier = r.vote.minAgree >= CONSENSUS_MIN_AGREE ? 'green'
+      : r.vote.minAgree < LIST_LOW_AGREE ? 'red' : 'gray';
+    const card = el('button', 'lcard');
+    card.dataset.i = idx;
+    card.append(el('span', 'lscore tier-' + tier, r.vote.minAgree + '% AGREEMENT'));
+    const row = el('div', 'lrow');
+    row.append(el('span', 'lAv', emojiFor(r)));
+    row.append(el('p', 'lText', '“' + r.text + '”'));
+    card.append(row);
+    card.onclick = () => open(idx);
+    lane.append(card);
+  });
+
+  $('#laneEnd').textContent = polls.length + ' perspectives in this theme';
+}
+
+function drawLane() {
+  const lane = $('#lane');
+  lane.innerHTML = '';
+  lane.classList.remove('quotesList', 'listView');
   const key = state.theme.key + '/' + state.mode;
   const L = layoutCache[key] || (layoutCache[key] = computeLayout(state.theme, state.mode));
   state.layout = L;
@@ -903,7 +1005,7 @@ function drawLane() {
   // now and again on the next frame — on a cold first paint the nav/
   // pills heights can read a px short before layout fully settles.
   const sizeMini = () => {
-    const topOffset = $('.l2nav').offsetHeight + $('.pills').offsetHeight;
+    const topOffset = chromeH();
     const available = innerHeight - topOffset - 24;
     mini.style.top = topOffset + 'px';
     mini.style.height = Math.max(120, Math.min(available, L.axisH)) + 'px';
@@ -1040,9 +1142,7 @@ function renderPreviewItem(idx) {
   const r = state.layout.items[idx].rec;
   const v = r.vote;
   $('#spAv').textContent = emojiFor(r);
-  $('#spEyebrow').textContent = state.mode === 'controversial'
-    ? v.gap + ' PT DIFFERENCE'
-    : v.minAgree + '% AGREEMENT';
+  $('#spEyebrow').textContent = v.minAgree + '% AGREEMENT';
   $('#spText').textContent = clip(r.text, PREVIEW_CLIP);
   $('#spCard').onclick = () => open(idx);
 }
@@ -1123,7 +1223,7 @@ function open(idx) {
   const r = it.rec;
   const t = state.theme;
 
-  const itemSel = state.mode === 'quotes' ? '.qcard' : '.sq';
+  const itemSel = state.mode === 'quotes' ? '.qcard' : state.mode === 'list' ? '.lcard' : '.sq';
   document.querySelectorAll(itemSel + '.sel').forEach(n => n.classList.remove('sel'));
   document.querySelector(`${itemSel}[data-i="${idx}"]`)?.classList.add('sel');
 
@@ -1210,7 +1310,7 @@ function open(idx) {
   $('#l3').setAttribute('aria-hidden', 'false');
   $('#cardbody').scrollTop = 0;
   autoScroll();
-  if (state.mode !== 'quotes') keepInView(it);
+  if (state.mode === 'map') keepInView(it);
   $('#closeb').focus({ preventScroll: true });
 }
 
@@ -1264,7 +1364,7 @@ function close() {
   document.body.classList.remove('reading');
   $('#l3').classList.remove('on');
   $('#l3').setAttribute('aria-hidden', 'true');
-  const s = document.querySelector('.sq.sel, .qcard.sel');
+  const s = document.querySelector('.sq.sel, .qcard.sel, .lcard.sel');
   s?.classList.remove('sel');
   s?.focus({ preventScroll: true });
   state.sel = -1;
@@ -1294,8 +1394,8 @@ function route() {
   const themeChanged = state.theme !== t;
   const changed = themeChanged || (mode && mode !== state.mode);
   state.theme = t;
-  if (mode && (MODES[mode] || mode === 'quotes')) state.mode = mode;
-  else if (themeChanged) state.mode = 'consensus';   // every theme starts on Consensus unless the link says otherwise
+  if (mode && (MODES[mode] || mode === 'quotes' || mode === 'list')) state.mode = mode;
+  else if (themeChanged) state.mode = 'list';   // every theme starts on List unless the link says otherwise
   $('#l1').style.display = 'none';
   $('#l2').classList.add('on');
   $('#l2').setAttribute('aria-hidden', 'false');
@@ -1331,7 +1431,9 @@ addEventListener('resize', () => {
   rw = setTimeout(() => {
     if (!$('#l2').classList.contains('on')) return;
     const s = state.sel;
-    if (state.mode === 'quotes') drawQuotes(); else drawLane();
+    if (state.mode === 'quotes') drawQuotes();
+    else if (state.mode === 'list') drawList();
+    else drawLane();
     if (s > -1) open(s);
   }, 220);
 });

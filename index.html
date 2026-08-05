@@ -274,36 +274,72 @@ body.reading #l2{padding-bottom:82vh}
 .lcard{
   display:block;width:100%;text-align:left;
   background:#fff;border-radius:20px;
-  padding:16px 18px 18px;
+  padding:16px 18px 0;
+  overflow:hidden;   /* so the bottom viz's bleed can meet the card's own rounded corners */
   -webkit-tap-highlight-color:transparent;
   transition:transform .2s ease,box-shadow .2s ease;
   box-shadow:0 1px 3px rgba(0,0,0,.12);
-}
-.lscore{
-  display:inline-block;
-  font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
-  color:#fff;padding:5px 11px;border-radius:999px;
-  margin-bottom:12px;
-}
-.lscore.tier-green{background:var(--agree)}
-.lscore.tier-gray{background:#484848}
-.lscore.tier-red{background:var(--disagree)}
-.lrow{display:flex;align-items:flex-start;gap:12px}
-.lAv{
-  flex:none;width:38px;height:38px;border-radius:50%;
-  background:color-mix(in srgb,var(--c) 9%,#fff);
-  display:grid;place-items:center;
-  font-size:19px;
-}
-.lText{
-  margin:0;color:var(--ink);
-  font-family:var(--geom);font-weight:600;
-  font-size:16.5px;line-height:1.4;letter-spacing:-.006em;
 }
 @media (hover:hover){
   .lcard:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.22)}
 }
 .lcard.sel{box-shadow:0 0 0 3px var(--c),0 10px 30px rgba(0,0,0,.28)}
+
+/* eyebrow — the participant's emoji plus their demographic chips,
+   marqueeing sideways when the text is too long for the card */
+.lWho{
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:9px;
+  color:color-mix(in srgb,var(--c) 62%,#000);
+}
+.lWho .lEmoji{flex:none;font-size:15px;line-height:1}
+.lWho .lDemoWrap{flex:1;min-width:0;overflow:hidden}
+.lWho .lDemoTrack{
+  display:inline-flex;gap:2.4em;white-space:nowrap;
+  font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+}
+.lWho .lDemoTrack.marquee{animation:lDemoScroll var(--marquee-dur,10s) linear infinite}
+@keyframes lDemoScroll{from{transform:translateX(0)}to{transform:translateX(var(--marquee-dist,-50%))}}
+
+.lText{
+  margin:0 0 16px;color:var(--ink);
+  font-family:var(--geom);font-weight:600;
+  font-size:23px;line-height:1.32;letter-spacing:-.012em;
+}
+
+/* bottom viz — where each group's agreement % lands on a disagree-to-
+   agree track. Labels sit in the card's normal (uncolored) flow; only
+   the track itself is tinted and bled flush to the card's edges (and
+   its bottom corners). */
+.lBarLabels{
+  display:flex;justify-content:space-between;
+  font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  color:rgba(0,0,0,.8);
+  margin-bottom:8px;
+}
+.lBar{
+  margin:0 -18px;
+  padding:10px 18px 14px;
+  background:color-mix(in srgb,var(--c) 13%,transparent);
+}
+.lBarTrack{position:relative;height:26px}
+.lBarMid{
+  position:absolute;left:50%;top:0;bottom:0;width:1px;
+  background:rgba(0,0,0,.18);
+  transform:translateX(-50%);
+}
+.lBarLine{
+  position:absolute;top:50%;height:2.5px;
+  background:var(--c);transform:translateY(-50%);
+}
+.lBarSq{
+  position:absolute;top:50%;width:26px;height:26px;
+  transform:translate(-50%,-50%);
+  background:var(--c);border-radius:6px;
+  display:grid;place-items:center;
+  font-family:var(--geom);font-weight:700;font-size:11px;color:#fff;
+  box-shadow:0 2px 6px rgba(0,0,0,.25);
+}
 
 .sq{
   position:absolute;padding:0;
@@ -790,11 +826,9 @@ const MODES = {
 const SCRUB_TICK = { map: v => v + '%' };
 const SCRUB_INSET = 70;   // px reserved on the left of the lane so squares clear the scrub pill
 
-// thresholds shared by the statement-card indicator pill and the List
-// tab's score pill (consensus/difference/neutral, green/gray/red)
+// thresholds for the statement-card indicator pill (consensus/difference/neutral)
 const DIFFERENCE_MIN_GAP = 35;    // group-to-group gap (points) counted as a real split
 const CONSENSUS_MIN_AGREE = 65;   // minAgree (%) counted as both groups genuinely on board
-const LIST_LOW_AGREE = 35;        // minAgree (%) below which List's pill reads red
 
 const state = { theme: null, mode: 'list', sel: -1, layout: [] };
 let bubbleTimer = null, scrollRaf = null, l1Scroll = 0, kivTimer = null, scrubRaf = null;
@@ -957,17 +991,71 @@ function drawList() {
   lane.append(orderBtn);
 
   polls.forEach((r, idx) => {
-    const tier = r.vote.minAgree >= CONSENSUS_MIN_AGREE ? 'green'
-      : r.vote.minAgree < LIST_LOW_AGREE ? 'red' : 'gray';
     const card = el('button', 'lcard');
     card.dataset.i = idx;
-    card.append(el('span', 'lscore tier-' + tier, r.vote.minAgree + '% AGREEMENT'));
-    const row = el('div', 'lrow');
-    row.append(el('span', 'lAv', emojiFor(r)));
-    row.append(el('p', 'lText', '“' + r.text + '”'));
-    card.append(row);
+
+    // eyebrow: who said it — emoji plus their demographic chips (or
+    // "Host statement" for COCAP-seeded statements with no participant)
+    const who = el('div', 'lWho');
+    who.append(el('span', 'lEmoji', emojiFor(r)));
+    const demoWrap = el('div', 'lDemoWrap');
+    // "Not Provided" is a placeholder for a field the participant skipped,
+    // not a real demographic — drop it rather than display it verbatim
+    const demoChips = r.chips.filter(c => c.toLowerCase() !== 'not provided');
+    const demoText = r.origin === 'cocap_seed'
+      ? 'Host statement'
+      : (demoChips.length ? demoChips.map(titleCaseChip).join(', ') : 'Anonymous');
+    const demoTrack = el('span', 'lDemoTrack');
+    demoTrack.append(el('span', null, demoText));
+    demoWrap.append(demoTrack);
+    who.append(demoWrap);
+    card.append(who);
+
+    card.append(el('p', 'lText', '“' + r.text + '”'));
+
+    // bottom viz: each group's agree% mapped onto a disagree→agree track.
+    // Labels live in the card's normal flow, uncolored; only the track
+    // itself (line, squares, midpoint) sits inside the tinted bar.
+    const labels = el('div', 'lBarLabels');
+    labels.append(el('span', null, '<- Disagree (0%)'), el('span', null, 'Agree (100%) ->'));
+    card.append(labels);
+    const barWrap = el('div', 'lBar');
+    const track = el('div', 'lBarTrack');
+    const mid = el('div', 'lBarMid');
+    const line = el('div', 'lBarLine');
+    const sqA = el('div', 'lBarSq', 'A');
+    const sqB = el('div', 'lBarSq', 'B');
+    track.append(mid, line, sqA, sqB);
+    barWrap.append(track);
+    card.append(barWrap);
+
     card.onclick = () => open(idx);
     lane.append(card);
+
+    // the two squares + connecting line need the track's real rendered
+    // width, so this only makes sense once the card is actually in the DOM
+    const HALF_SQ = 13;
+    const w = track.clientWidth;
+    const xFor = pct => HALF_SQ + (w - HALF_SQ * 2) * Math.max(0, Math.min(100, pct)) / 100;
+    const xA = xFor(r.vote.A.pct), xB = xFor(r.vote.B.pct);
+    sqA.style.left = xA + 'px';
+    sqB.style.left = xB + 'px';
+    line.style.left = Math.min(xA, xB) + 'px';
+    line.style.width = Math.abs(xA - xB) + 'px';
+
+    // marquee the demographic line only if it's actually too long to fit,
+    // and only if the user hasn't asked for reduced motion
+    if (!REDUCED && demoTrack.scrollWidth > demoWrap.clientWidth) {
+      const singleW = demoTrack.firstChild.getBoundingClientRect().width;
+      const dupe = el('span', null, demoText);
+      dupe.setAttribute('aria-hidden', 'true');
+      demoTrack.append(dupe);
+      const gapPx = parseFloat(getComputedStyle(demoTrack).columnGap) || 0;
+      const dist = singleW + gapPx;
+      demoTrack.style.setProperty('--marquee-dist', `-${dist}px`);
+      demoTrack.style.setProperty('--marquee-dur', Math.max(4, dist / 34) + 's');
+      demoTrack.classList.add('marquee');
+    }
   });
 
   $('#laneEnd').textContent = polls.length + ' perspectives in this theme';

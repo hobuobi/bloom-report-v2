@@ -261,8 +261,20 @@ body.reading #l2{padding-bottom:82vh}
   display:flex;flex-direction:column;gap:12px;
   padding:6px 22px 46px;
 }
+/* sticks directly below the nav + pills (same measured offset the
+   minimap uses in Map mode), bleeding edge-to-edge like .pills despite
+   the lane's own side padding */
+.listTop{
+  position:sticky;z-index:24;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  margin:0 -22px;
+  padding:14px 22px;
+  background:var(--c);
+  border-bottom:1px solid rgba(255,255,255,.17);
+  transition:opacity .28s ease;
+}
+body.reading .listTop{opacity:0;pointer-events:none}
 .orderSwitch{
-  align-self:flex-start;
   font-family:var(--body);font-size:13px;font-weight:600;
   color:#fff;
   background:rgba(255,255,255,.1);
@@ -271,6 +283,17 @@ body.reading #l2{padding-bottom:82vh}
 }
 .orderSwitch:hover{background:rgba(255,255,255,.18)}
 .orderSwitch:active{background:rgba(255,255,255,.08)}
+.listKey{
+  display:flex;align-items:center;gap:5px;
+  font-family:var(--mono);font-size:12.5px;font-weight:700;letter-spacing:.04em;
+  color:rgba(255,255,255,.85);
+}
+.lKeySq{
+  flex:none;display:grid;place-items:center;
+  width:17px;height:17px;
+  background:#fff;border-radius:4px;
+  font-family:var(--geom);font-weight:700;font-size:10px;color:var(--c);
+}
 .lcard{
   display:block;width:100%;text-align:left;
   background:#fff;border-radius:20px;
@@ -986,9 +1009,18 @@ function drawList() {
     .sort((a, b) => dir * (M.score(b) - M.score(a)) || b.vote.total - a.vote.total);
   state.layout = { items: polls.map(r => ({ rec: r })) };
 
+  const topRow = el('div', 'listTop');
   const orderBtn = el('button', 'orderSwitch', 'Switch order');
   orderBtn.onclick = () => { listAsc = !listAsc; drawList(); };
-  lane.append(orderBtn);
+  const key = el('div', 'listKey');
+  key.append(
+    el('span', 'lKeySq', 'A'), document.createTextNode('= Skeptics;'),
+    el('span', 'lKeySq', 'B'), document.createTextNode('= Optimists'));
+  topRow.append(orderBtn, key);
+  lane.append(topRow);
+  const setTopRowTop = () => { topRow.style.top = chromeH() + 'px'; };
+  setTopRowTop();
+  document.fonts.ready.then(setTopRowTop);   // web-font swap can nudge pills' height by a px after first paint
 
   polls.forEach((r, idx) => {
     const card = el('button', 'lcard');

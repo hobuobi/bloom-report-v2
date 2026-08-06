@@ -346,6 +346,16 @@ body.reading .listTop{opacity:0;pointer-events:none}
   background:color-mix(in srgb,var(--c) 13%,transparent);
 }
 .lBarTrack{position:relative;height:26px}
+/* 0%/100% end labels — centered on the same 13px inset the A/B squares
+   use at their own extremes (HALF_SQ in the JS), so a square sitting
+   right on 0% or 100% lands directly on top of its label */
+.lBarEdge{
+  position:absolute;top:50%;
+  font-family:var(--geom);font-weight:700;font-size:14px;
+  color:var(--c);opacity:.65;
+}
+.lBarEdge.lo{left:13px;transform:translate(-50%,-50%)}
+.lBarEdge.hi{right:13px;transform:translate(50%,-50%)}
 .lBarMid{
   position:absolute;left:50%;top:0;bottom:0;width:1px;
   background:rgba(0,0,0,.18);
@@ -1053,11 +1063,13 @@ function drawList() {
     card.append(labels);
     const barWrap = el('div', 'lBar');
     const track = el('div', 'lBarTrack');
+    const edgeLo = el('span', 'lBarEdge lo', '0%');
+    const edgeHi = el('span', 'lBarEdge hi', '100%');
     const mid = el('div', 'lBarMid');
     const line = el('div', 'lBarLine');
     const sqA = el('div', 'lBarSq', 'A');
     const sqB = el('div', 'lBarSq', 'B');
-    track.append(mid, line, sqA, sqB);
+    track.append(edgeLo, edgeHi, mid, line, sqA, sqB);
     barWrap.append(track);
     card.append(barWrap);
 

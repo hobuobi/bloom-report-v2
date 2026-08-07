@@ -261,8 +261,20 @@ body.reading #l2{padding-bottom:82vh}
   display:flex;flex-direction:column;gap:12px;
   padding:6px 22px 46px;
 }
+/* sticks directly below the nav + pills (same measured offset the
+   minimap uses in Map mode), bleeding edge-to-edge like .pills despite
+   the lane's own side padding */
+.listTop{
+  position:sticky;z-index:24;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  margin:0 -22px;
+  padding:14px 22px;
+  background:var(--c);
+  border-bottom:1px solid rgba(255,255,255,.17);
+  transition:opacity .28s ease;
+}
+body.reading .listTop{opacity:0;pointer-events:none}
 .orderSwitch{
-  align-self:flex-start;
   font-family:var(--body);font-size:13px;font-weight:600;
   color:#fff;
   background:rgba(255,255,255,.1);
@@ -271,6 +283,17 @@ body.reading #l2{padding-bottom:82vh}
 }
 .orderSwitch:hover{background:rgba(255,255,255,.18)}
 .orderSwitch:active{background:rgba(255,255,255,.08)}
+.listKey{
+  display:flex;align-items:center;gap:5px;
+  font-family:var(--mono);font-size:12.5px;font-weight:700;letter-spacing:.04em;
+  color:rgba(255,255,255,.85);
+}
+.lKeySq{
+  flex:none;display:grid;place-items:center;
+  width:17px;height:17px;
+  background:#fff;border-radius:4px;
+  font-family:var(--geom);font-weight:700;font-size:10px;color:var(--c);
+}
 .lcard{
   display:block;width:100%;text-align:left;
   background:#fff;border-radius:20px;
@@ -312,17 +335,28 @@ body.reading #l2{padding-bottom:82vh}
    the track itself is tinted and bled flush to the card's edges (and
    its bottom corners). */
 .lBarLabels{
-  display:flex;justify-content:space-between;
+  display:flex;justify-content:space-between;align-items:flex-end;gap:10px;
   font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;
   color:rgba(0,0,0,.8);
   margin-bottom:8px;
 }
+.lBarLabels .who{flex:none}
 .lBar{
   margin:0 -18px;
   padding:10px 18px 14px;
   background:color-mix(in srgb,var(--c) 13%,transparent);
 }
 .lBarTrack{position:relative;height:26px}
+/* 0%/100% end labels — centered on the same 13px inset the A/B squares
+   use at their own extremes (HALF_SQ in the JS), so a square sitting
+   right on 0% or 100% lands directly on top of its label */
+.lBarEdge{
+  position:absolute;top:50%;
+  font-family:var(--geom);font-weight:700;font-size:14px;
+  color:var(--c);opacity:.65;
+}
+.lBarEdge.lo{left:13px;transform:translate(-50%,-50%)}
+.lBarEdge.hi{right:13px;transform:translate(50%,-50%)}
 .lBarMid{
   position:absolute;left:50%;top:0;bottom:0;width:1px;
   background:rgba(0,0,0,.18);
@@ -830,6 +864,15 @@ const SCRUB_INSET = 70;   // px reserved on the left of the lane so squares clea
 const DIFFERENCE_MIN_GAP = 35;    // group-to-group gap (points) counted as a real split
 const CONSENSUS_MIN_AGREE = 65;   // minAgree (%) counted as both groups genuinely on board
 
+// shared by the statement modal's pill and the List card's bar-top pill
+const pillInfoFor = v => {
+  if (v.gap >= DIFFERENCE_MIN_GAP)
+    return { cls: 'difference', icon: 'static/difference.svg', label: 'DIFFERENCE (' + v.gap + ' PTS)' };
+  if (v.minAgree >= CONSENSUS_MIN_AGREE)
+    return { cls: 'consensus', icon: 'static/consensus.svg', label: 'CONSENSUS (' + v.minAgree + '% PRO)' };
+  return { cls: 'neutral', icon: null, label: v.minAgree + '% AGREE' };
+};
+
 const state = { theme: null, mode: 'list', sel: -1, layout: [] };
 let bubbleTimer = null, scrollRaf = null, l1Scroll = 0, kivTimer = null, scrubRaf = null;
 let listAsc = false;   // List tab sort direction — toggled by the "Switch order" button
@@ -986,9 +1029,18 @@ function drawList() {
     .sort((a, b) => dir * (M.score(b) - M.score(a)) || b.vote.total - a.vote.total);
   state.layout = { items: polls.map(r => ({ rec: r })) };
 
+  const topRow = el('div', 'listTop');
   const orderBtn = el('button', 'orderSwitch', 'Switch order');
   orderBtn.onclick = () => { listAsc = !listAsc; drawList(); };
-  lane.append(orderBtn);
+  const key = el('div', 'listKey');
+  key.append(
+    el('span', 'lKeySq', 'A'), document.createTextNode('= Skeptics;'),
+    el('span', 'lKeySq', 'B'), document.createTextNode('= Optimists'));
+  topRow.append(orderBtn, key);
+  lane.append(topRow);
+  const setTopRowTop = () => { topRow.style.top = chromeH() + 'px'; };
+  setTopRowTop();
+  document.fonts.ready.then(setTopRowTop);   // web-font swap can nudge pills' height by a px after first paint
 
   polls.forEach((r, idx) => {
     const card = el('button', 'lcard');
@@ -1017,15 +1069,22 @@ function drawList() {
     // Labels live in the card's normal flow, uncolored; only the track
     // itself (line, squares, midpoint) sits inside the tinted bar.
     const labels = el('div', 'lBarLabels');
-    labels.append(el('span', null, '<- Disagree (0%)'), el('span', null, 'Agree (100%) ->'));
+    const { cls, icon, label } = pillInfoFor(r.vote);
+    const pill = el('div', 'who ' + cls);
+    const pillAv = el('span', 'av');
+    if (icon) pillAv.innerHTML = `<img src="${icon}" alt="">`;
+    pill.append(pillAv, el('span', 'txt', label));
+    labels.append(el('span', null, '<- Disagree (0%)'), pill, el('span', null, 'Agree (100%) ->'));
     card.append(labels);
     const barWrap = el('div', 'lBar');
     const track = el('div', 'lBarTrack');
+    const edgeLo = el('span', 'lBarEdge lo', '0%');
+    const edgeHi = el('span', 'lBarEdge hi', '100%');
     const mid = el('div', 'lBarMid');
     const line = el('div', 'lBarLine');
     const sqA = el('div', 'lBarSq', 'A');
     const sqB = el('div', 'lBarSq', 'B');
-    track.append(mid, line, sqA, sqB);
+    track.append(edgeLo, edgeHi, mid, line, sqA, sqB);
     barWrap.append(track);
     card.append(barWrap);
 
@@ -1320,15 +1379,7 @@ function open(idx) {
   const who = $('#who');
   who.hidden = !r.vote;
   if (r.vote) {
-    const v = r.vote;
-    let cls, icon, label;
-    if (v.gap >= DIFFERENCE_MIN_GAP) {
-      cls = 'difference'; icon = 'static/difference.svg'; label = 'DIFFERENCE (' + v.gap + ' PTS)';
-    } else if (v.minAgree >= CONSENSUS_MIN_AGREE) {
-      cls = 'consensus'; icon = 'static/consensus.svg'; label = 'CONSENSUS (' + v.minAgree + '% PRO)';
-    } else {
-      cls = 'neutral'; icon = null; label = v.minAgree + '% AGREE';
-    }
+    const { cls, icon, label } = pillInfoFor(r.vote);
     who.className = 'who ' + cls;
     $('#whoAv').innerHTML = icon ? `<img src="${icon}" alt="">` : '';
     $('#whoTxt').textContent = label;
